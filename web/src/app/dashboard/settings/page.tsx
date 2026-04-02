@@ -142,6 +142,9 @@ function SettingsContent() {
   } | null>(null)
   const [cardLoading, setCardLoading] = useState(false)
 
+  // Card update state
+  const [cardUpdating, setCardUpdating] = useState(false)
+
   // Delete state
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -162,6 +165,19 @@ function SettingsContent() {
         text: 'Checkout was cancelled. Your plan has not changed.',
       })
       setActiveTab('subscription')
+    }
+
+    // Handle return from card update
+    const tab = searchParams.get('tab')
+    const updated = searchParams.get('updated')
+    if (tab === 'card') {
+      setActiveTab('card')
+      if (updated === 'true') {
+        setMessage({
+          type: 'success',
+          text: 'Your payment method has been updated successfully.',
+        })
+      }
     }
   }, [searchParams])
 
@@ -278,6 +294,32 @@ function SettingsContent() {
       loadCardInfo()
     }
   }, [activeTab, currentPlan])
+
+  async function handleUpdateCard() {
+    setCardUpdating(true)
+    try {
+      const response = await fetch('/api/settings/update-card', {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setMessage({
+          type: 'error',
+          text: data.error || 'Failed to open card update',
+        })
+      }
+    } catch {
+      setMessage({
+        type: 'error',
+        text: 'Something went wrong. Please try again.',
+      })
+    } finally {
+      setCardUpdating(false)
+    }
+  }
 
   async function handleUpgrade(plan: string) {
     setCheckoutLoading(plan)
@@ -778,11 +820,11 @@ function SettingsContent() {
                         </td>
                         <td className="px-6 py-4">
                           <button
-                            onClick={handleManageBilling}
-                            disabled={portalLoading}
+                            onClick={handleUpdateCard}
+                            disabled={cardUpdating}
                             className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition"
                           >
-                            {portalLoading ? (
+                            {cardUpdating ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
                               <CreditCard className="w-3.5 h-3.5" />
@@ -795,8 +837,23 @@ function SettingsContent() {
                   </table>
                 </div>
 
+                <div className="mt-6 flex gap-3">
+                  <button
+                    onClick={handleUpdateCard}
+                    disabled={cardUpdating}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50"
+                  >
+                    {cardUpdating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    Update Card
+                  </button>
+                </div>
+
                 <p className="mt-4 text-sm text-gray-400 dark:text-gray-500">
-                  Card updates are managed securely through Stripe.
+                  Card updates are handled securely through Stripe.
                 </p>
               </div>
             ) : (
@@ -806,11 +863,11 @@ function SettingsContent() {
                   No card found on file
                 </p>
                 <button
-                  onClick={handleManageBilling}
-                  disabled={portalLoading}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50"
+                  onClick={handleUpdateCard}
+                  disabled={cardUpdating}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50"
                 >
-                  {portalLoading ? (
+                  {cardUpdating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <CreditCard className="w-4 h-4" />
