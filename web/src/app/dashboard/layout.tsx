@@ -68,10 +68,10 @@ export default function DashboardLayout({
     { label: 'Members', href: '/dashboard/members', icon: Users },
     { label: 'Groups', href: '/dashboard/groups', icon: Share2 },
     { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-    { label: 'Email', href: '/dashboard/email', icon: Mail },
-    { label: 'Automations', href: '/dashboard/automations', icon: Bot },
-    { label: 'Integrations', href: '/dashboard/integrations', icon: Zap },
-    { label: 'Team', href: '/dashboard/team', icon: UserPlus },
+    // { label: 'Email', href: '/dashboard/email', icon: Mail },
+    // { label: 'Automations', href: '/dashboard/automations', icon: Bot },
+    // { label: 'Integrations', href: '/dashboard/integrations', icon: Zap },
+    // { label: 'Team', href: '/dashboard/team', icon: UserPlus },
     { label: 'Settings', href: '/dashboard/settings', icon: Settings },
   ]
 
