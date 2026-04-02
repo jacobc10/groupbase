@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import {
   Search, Filter, MoreVertical, Plus, Download, Upload, ChevronLeft, ChevronRight,
@@ -27,23 +28,34 @@ export default function MembersPage() {
   const [bulkTagInput, setBulkTagInput] = useState('')
   const [showBulkTag, setShowBulkTag] = useState(false)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [tagFilter, setTagFilter] = useState('')
   const [allTags, setAllTags] = useState<string[]>([])
   const [inlineTagMemberId, setInlineTagMemberId] = useState<string | null>(null)
   const [inlineTagInput, setInlineTagInput] = useState('')
-  const actionMenuRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const limit = 25
 
-  // Close action menu when clicking outside
+  // Close action menu when clicking outside or scrolling
   useEffect(() => {
+    if (!actionMenuId) return
     function handleClickOutside(e: MouseEvent) {
-      if (actionMenuId && actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setActionMenuId(null)
+        setMenuPos(null)
       }
     }
+    function handleScroll() {
+      setActionMenuId(null)
+      setMenuPos(null)
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
   }, [actionMenuId])
 
   const statusColors = {
@@ -561,60 +573,22 @@ export default function MembersPage() {
                       {new Date(member.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-sm">
-                      <div className="relative" ref={actionMenuId === member.id ? actionMenuRef : undefined}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setActionMenuId(actionMenuId === member.id ? null : member.id)
-                          }}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition"
-                        >
-                          <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                        </button>
-                        {actionMenuId === member.id && (
-                          <div className="absolute right-0 top-full z-50 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
-                            <Link
-                              href={`/dashboard/members/${member.id}`}
-                              className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => setActionMenuId(null)}
-                            >
-                              View Details
-                            </Link>
-                            {member.fb_profile_url && (
-                              <a
-                                href={member.fb_profile_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                                onClick={() => setActionMenuId(null)}
-                              >
-                                Facebook Profile
-                              </a>
-                            )}
-                            {(member.fb_user_id || member.fb_profile_url) && (
-                              <a
-                                href={
-                                  member.fb_user_id
-                                    ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
-                                    : `${(member.fb_profile_url || '').replace(/\/$/, '')}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                                onClick={() => setActionMenuId(null)}
-                              >
-                                Send Message
-                              </a>
-                            )}
-                            <button
-                              onClick={() => handleDeleteMember(member.id)}
-                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (actionMenuId === member.id) {
+                            setActionMenuId(null)
+                            setMenuPos(null)
+                          } else {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 })
+                            setActionMenuId(member.id)
+                          }
+                        }}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition"
+                      >
+                        <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -721,6 +695,64 @@ export default function MembersPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Action Menu Portal - rendered outside overflow containers */}
+      {actionMenuId && menuPos && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1"
+          style={{ top: menuPos.top, left: Math.max(0, menuPos.left), zIndex: 9999 }}
+        >
+          <Link
+            href={`/dashboard/members/${actionMenuId}`}
+            className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+            onClick={() => { setActionMenuId(null); setMenuPos(null) }}
+          >
+            View Details
+          </Link>
+          {(() => {
+            const member = members.find(m => m.id === actionMenuId)
+            if (!member) return null
+            return (
+              <>
+                {member.fb_profile_url && (
+                  <a
+                    href={member.fb_profile_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => { setActionMenuId(null); setMenuPos(null) }}
+                  >
+                    Facebook Profile
+                  </a>
+                )}
+                {(member.fb_user_id || member.fb_profile_url) && (
+                  <a
+                    href={
+                      member.fb_user_id
+                        ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
+                        : `${(member.fb_profile_url || '').replace(/\/$/, '')}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => { setActionMenuId(null); setMenuPos(null) }}
+                  >
+                    Send Message
+                  </a>
+                )}
+                <button
+                  onClick={() => handleDeleteMember(member.id)}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  Delete
+                </button>
+              </>
+            )
+          })()}
+        </div>,
+        document.body
       )}
     </div>
   )
