@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import {
   Search, Filter, MoreVertical, Plus, Download, Upload, ChevronLeft, ChevronRight,
-  Loader2, Tag, Trash2, CheckSquare, Square, X
+  Loader2, Tag, Trash2, CheckSquare, Square, X, MessageCircle
 } from 'lucide-react'
 import type { Member, Group, MemberStatus } from '@/types/database'
 
@@ -573,22 +573,39 @@ export default function MembersPage() {
                       {new Date(member.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (actionMenuId === member.id) {
-                            setActionMenuId(null)
-                            setMenuPos(null)
-                          } else {
-                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                            setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 })
-                            setActionMenuId(member.id)
-                          }
-                        }}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition"
-                      >
-                        <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {(member.fb_user_id || member.fb_profile_url) && (
+                          <a
+                            href={
+                              member.fb_user_id
+                                ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
+                                : `${(member.fb_profile_url || '').replace(/\/$/, '')}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
+                            title="Send Facebook Message"
+                          >
+                            <MessageCircle className="w-4 h-4 text-blue-600" />
+                          </a>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (actionMenuId === member.id) {
+                              setActionMenuId(null)
+                              setMenuPos(null)
+                            } else {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                              setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 })
+                              setActionMenuId(member.id)
+                            }
+                          }}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition"
+                        >
+                          <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
