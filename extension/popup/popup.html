@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GroupBase</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+        Arial, sans-serif;
+      width: 380px;
+      background: #f8f9fa;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+      font-weight: 500;
+    }
+
+    /* Container */
+    .container {
+      padding: 20px;
+    }
+
+    /* Login Form */
+    .login-form {
+      display: none;
+    }
+
+    .login-form.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    input::placeholder {
+      color: #a0aec0;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-top: 8px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #2d3748;
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 13px;
+      width: auto;
+      margin-top: 0;
+    }
+
+    /* Dashboard */
+    .dashboard {
+      display: none;
+    }
+
+    .dashboard.active {
+      display: block;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+
+    .stat-number {
+      font-size: 28px;
+      font-weight: 700;
+      color: #667eea;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #718096;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .quick-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .btn-action {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #2d3748;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn-action:hover {
+      border-color: #667eea;
+      background: #f7fafc;
+    }
+
+    .btn-action::after {
+      content: '→';
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    /* Messages */
+    .message {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .message.active {
+      display: block;
+    }
+
+    .message.error {
+      background: #fed7d7;
+      color: #742a2a;
+      border: 1px solid #fc8181;
+    }
+
+    .message.success {
+      background: #c6f6d5;
+      color: #22543d;
+      border: 1px solid #9ae6b4;
+    }
+
+    .message.loading {
+      background: #bee3f8;
+      color: #2c5282;
+      border: 1px solid #90cdf4;
+    }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #667eea;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Logout button */
+    .logout-section {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+
+    .btn-logout {
+      background: #fff5f5;
+      color: #c53030;
+      border: 1px solid #feb2b2;
+    }
+
+    .btn-logout:hover {
+      background: #fed7d7;
+      border-color: #fc8181;
+    }
+
+    /* Groups list */
+    .groups-list {
+      margin-bottom: 16px;
+    }
+
+    .group-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .group-name {
+      font-weight: 500;
+      color: #2d3748;
+    }
+
+    .group-id {
+      font-size: 11px;
+      color: #a0aec0;
+    }
+
+    /* Status Summary */
+    .status-summary {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+
+    .status-summary-label {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-summary-content {
+      color: #4a5568;
+      line-height: 1.5;
+    }
+
+    /* Quick Search */
+    .quick-search {
+      margin-bottom: 16px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .search-input::placeholder {
+      color: #a0aec0;
+    }
+
+    /* Recent Captures */
+    .recent-captures {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 16px;
+    }
+
+    .recent-captures-label {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .capture-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 12px;
+      border-bottom: 1px solid #edf2f7;
+    }
+
+    .capture-item:last-child {
+      border-bottom: none;
+    }
+
+    .capture-name {
+      font-weight: 500;
+      color: #2d3748;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .capture-time {
+      font-size: 11px;
+      color: #a0aec0;
+      margin-left: 8px;
+    }
+
+    .captures-empty {
+      font-size: 12px;
+      color: #a0aec0;
+      font-style: italic;
+    }
+
+    /* Quick Add Tag */
+    .quick-add-tag {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tag-input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .tag-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .tag-input::placeholder {
+      color: #a0aec0;
+    }
+
+    .btn-add-tag {
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-add-tag:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-add-tag:active {
+      transform: translateY(0);
+    }
+
+    .btn-add-tag:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>GroupBase</h1>
+    <p>Your Facebook Group CRM</p>
+  </div>
+
+  <div class="container">
+    <!-- Messages -->
+    <div id="message" class="message"></div>
+
+    <!-- Login Form -->
+    <div id="loginForm" class="login-form active">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="your@email.com" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" />
+      </div>
+
+      <button id="loginBtn" class="btn-primary">Sign In</button>
+      <p style="font-size: 12px; color: #718096; margin-top: 12px; text-align: center">
+        Create an account on our dashboard
+      </p>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="groupsCount">0</div>
+          <div class="stat-label">Groups</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalMembers">0</div>
+          <div class="stat-label">Total Members</div>
+        </div>
+        <div class="stat-card" style="grid-column: span 2;">
+          <div class="stat-number" id="membersToday">0</div>
+          <div class="stat-label">Captured Today</div>
+        </div>
+      </div>
+
+      <!-- Status Summary -->
+      <div id="statusSummary" class="status-summary" style="display:none;">
+        <div class="status-summary-label">Status Summary</div>
+        <div class="status-summary-content" id="statusSummaryContent"></div>
+      </div>
+
+      <div id="groupsList" class="groups-list" style="display:none;"></div>
+
+      <!-- Quick Search -->
+      <div class="quick-search">
+        <input type="text" id="quickSearchInput" class="search-input" placeholder="Search members..." />
+      </div>
+
+      <!-- Recent Captures -->
+      <div id="recentCaptures" class="recent-captures" style="display:none;">
+        <div class="recent-captures-label">Recent Captures</div>
+        <div id="recentCapturesContent"></div>
+      </div>
+
+      <!-- Quick Add Tag -->
+      <div class="quick-add-tag">
+        <input type="text" id="tagInput" class="tag-input" placeholder="Add tag to last capture..." />
+        <button id="addTagBtn" class="btn-add-tag">Add Tag</button>
+      </div>
+
+      <div class="quick-actions">
+        <button id="openDashboardBtn" class="btn-action">View Full Dashboard</button>
+        <button id="openSettingsBtn" class="btn-action">Settings</button>
+      </div>
+
+      <div class="logout-section">
+        <button id="logoutBtn" class="btn-logout btn-action">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

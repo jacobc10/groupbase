@@ -1,0 +1,12 @@
+{
+  "name": "groupbase-extension",
+  "version": "1.0.0",
+  "description": "GroupBase Chrome Extension Icon Generator",
+  "main": "generate-icons.js",
+  "scripts": {
+    "generate-icons": "node generate-icons.js"
+  },
+  "dependencies": {
+    "canvas": "^2.11.2"
+  }
+}
