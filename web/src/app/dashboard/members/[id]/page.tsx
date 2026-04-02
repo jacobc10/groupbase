@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageCircle,
+  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageCircle, MessageSquare,
   Loader2, Save, Trash2, X, Plus
 } from 'lucide-react'
 import type { Member, ActivityLog, MemberStatus } from '@/types/database'
