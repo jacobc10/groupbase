@@ -26,8 +26,30 @@ interface AnalyticsData {
     id: string
     action: string
     timestamp: string
-    details?: string
+    details?: string | Record<string, unknown>
   }>
+}
+
+// Helper function to format activity details (can be string or object)
+function formatDetails(details: string | Record<string, unknown> | null | undefined): string {
+  if (!details) return ''
+  if (typeof details === 'string') return details
+  if (typeof details === 'object') {
+    // Format known fields nicely
+    const parts: string[] = []
+    if ('fb_name' in details && details.fb_name) parts.push(`${details.fb_name}`)
+    if ('source' in details && details.source) parts.push(`via ${String(details.source).replace(/_/g, ' ')}`)
+    if (parts.length > 0) return parts.join(' — ')
+    return JSON.stringify(details)
+  }
+  return String(details)
+}
+
+// Helper function to format action names
+function formatAction(action: string): string {
+  return action
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
 }
 
 // Helper function to format relative time
@@ -395,11 +417,11 @@ export default function AnalyticsDashboard() {
                   {/* Activity content */}
                   <div className="flex-1 py-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {activity.action}
+                      {formatAction(activity.action)}
                     </p>
                     {activity.details && (
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        {activity.details}
+                        {formatDetails(activity.details)}
                       </p>
                     )}
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
