@@ -18,7 +18,7 @@ export const PLANS = {
     productId: null,
     limits: {
       groups: 1,
-      membersPerGroup: 100,
+      membersPerGroup: 50,
       integrations: 0,
       teamMembers: 2,
       csvExport: false,
@@ -27,7 +27,7 @@ export const PLANS = {
     },
     features: [
       '1 Facebook Group',
-      'Up to 100 members',
+      'Up to 50 members',
       'Basic member management',
       'Chrome extension capture',
       'Member search & filter',
