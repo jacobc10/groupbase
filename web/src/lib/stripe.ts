@@ -22,6 +22,8 @@ export const PLANS = {
       integrations: 0,
       teamMembers: 1,
       csvExport: false,
+      emailsPerDay: 5,
+      emailsPerMonth: 150,
     },
     features: [
       '1 Facebook Group',
@@ -42,6 +44,8 @@ export const PLANS = {
       integrations: 5,
       teamMembers: 3,
       csvExport: true,
+      emailsPerDay: -1, // unlimited
+      emailsPerMonth: -1,
     },
     features: [
       'Up to 3 Facebook Groups',
@@ -63,6 +67,8 @@ export const PLANS = {
       integrations: -1,
       teamMembers: -1,
       csvExport: true,
+      emailsPerDay: -1, // unlimited
+      emailsPerMonth: -1,
     },
     features: [
       'Unlimited Facebook Groups',

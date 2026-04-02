@@ -119,6 +119,73 @@ export async function checkIntegrationLimit(userId: string, groupId: string): Pr
   }
 }
 
+export async function checkEmailLimit(userId: string, emailCount: number): Promise<{ allowed: boolean; dailyUsed: number; dailyLimit: number; monthlyUsed: number; monthlyLimit: number }> {
+  const supabase = await createClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan')
+    .eq('id', userId)
+    .single()
+
+  const plan = (profile?.plan as PlanKey) || 'free'
+  const limits = PLAN_LIMITS[plan]
+
+  // Unlimited emails
+  if (limits.emailsPerDay === -1 && limits.emailsPerMonth === -1) {
+    return { allowed: true, dailyUsed: 0, dailyLimit: -1, monthlyUsed: 0, monthlyLimit: -1 }
+  }
+
+  // Get user's groups to scope the activity log query
+  const { data: userGroups } = await supabase
+    .from('groups')
+    .select('id')
+    .eq('owner_id', userId)
+
+  if (!userGroups || userGroups.length === 0) {
+    return { allowed: true, dailyUsed: 0, dailyLimit: limits.emailsPerDay, monthlyUsed: 0, monthlyLimit: limits.emailsPerMonth }
+  }
+
+  const groupIds = userGroups.map(g => g.id)
+
+  // Count emails sent today
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
+  const { count: dailyCount } = await supabase
+    .from('activity_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('action', 'email_sent')
+    .in('group_id', groupIds)
+    .gte('created_at', todayStart.toISOString())
+
+  // Count emails sent this month
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  const { count: monthlyCount } = await supabase
+    .from('activity_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('action', 'email_sent')
+    .in('group_id', groupIds)
+    .gte('created_at', monthStart.toISOString())
+
+  const dailyUsed = dailyCount || 0
+  const monthlyUsed = monthlyCount || 0
+
+  const dailyOk = limits.emailsPerDay === -1 || (dailyUsed + emailCount) <= limits.emailsPerDay
+  const monthlyOk = limits.emailsPerMonth === -1 || (monthlyUsed + emailCount) <= limits.emailsPerMonth
+
+  return {
+    allowed: dailyOk && monthlyOk,
+    dailyUsed,
+    dailyLimit: limits.emailsPerDay,
+    monthlyUsed,
+    monthlyLimit: limits.emailsPerMonth,
+  }
+}
+
 export async function checkCsvExportAllowed(userId: string): Promise<boolean> {
   const supabase = await createClient()
 

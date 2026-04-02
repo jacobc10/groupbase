@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendBulkEmails } from '@/lib/email'
+import { checkEmailLimit } from '@/lib/plan-limits'
 
 interface SendEmailRequest {
   member_ids: string[]
@@ -62,6 +63,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'body is required and must be a string' },
         { status: 400 }
+      )
+    }
+
+    // Check email sending limits
+    const emailLimits = await checkEmailLimit(user.id, member_ids.length)
+    if (!emailLimits.allowed) {
+      const reason = emailLimits.dailyLimit !== -1 && (emailLimits.dailyUsed + member_ids.length) > emailLimits.dailyLimit
+        ? `Daily limit reached (${emailLimits.dailyUsed}/${emailLimits.dailyLimit} sent today)`
+        : `Monthly limit reached (${emailLimits.monthlyUsed}/${emailLimits.monthlyLimit} sent this month)`
+      return NextResponse.json(
+        { error: `Email limit exceeded. ${reason}. Upgrade your plan for more.`, code: 'EMAIL_LIMIT_REACHED' },
+        { status: 403 }
       )
     }
 

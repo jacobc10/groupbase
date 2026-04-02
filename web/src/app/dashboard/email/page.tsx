@@ -36,12 +36,22 @@ interface ActivityEntry {
   }
 }
 
+interface EmailLimits {
+  allowed: boolean
+  dailyUsed: number
+  dailyLimit: number
+  monthlyUsed: number
+  monthlyLimit: number
+}
+
 interface SendResult {
   sent: number
   skipped: number
   failed: number
   errors: Array<{ to: string; error: string }>
   success: boolean
+  error?: string
+  code?: string
 }
 
 export default function EmailPage() {
@@ -63,16 +73,27 @@ export default function EmailPage() {
   const [isFetchingActivity, setIsFetchingActivity] = useState(true)
   const [sendStatus, setSendStatus] = useState<SendResult | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [emailLimits, setEmailLimits] = useState<EmailLimits | null>(null)
+  const [limitError, setLimitError] = useState<string | null>(null)
 
-  // Fetch templates on mount
+  // Fetch templates, activity, and limits on mount
   useEffect(() => {
     fetchTemplates()
+    fetchRecentActivity()
+    fetchEmailLimits()
   }, [])
 
-  // Fetch activity on mount
-  useEffect(() => {
-    fetchRecentActivity()
-  }, [])
+  const fetchEmailLimits = async () => {
+    try {
+      const response = await fetch('/api/email/limits')
+      if (response.ok) {
+        const data = await response.json()
+        setEmailLimits(data)
+      }
+    } catch (error) {
+      console.error('Error fetching email limits:', error)
+    }
+  }
 
   const fetchTemplates = async () => {
     try {
@@ -169,6 +190,7 @@ export default function EmailPage() {
 
     setIsLoading(true)
     setSendStatus(null)
+    setLimitError(null)
 
     try {
       const response = await fetch('/api/email/send', {
@@ -183,9 +205,17 @@ export default function EmailPage() {
       })
 
       const data = (await response.json()) as SendResult
+
+      if (response.status === 403 && data.code === 'EMAIL_LIMIT_REACHED') {
+        setLimitError(data.error || 'Email limit reached. Upgrade your plan for more.')
+        setIsLoading(false)
+        return
+      }
+
       setSendStatus(data)
 
       if (data.success) {
+        fetchEmailLimits()
         setShowSuccess(true)
         setTimeout(() => {
           setShowSuccess(false)
@@ -229,6 +259,17 @@ export default function EmailPage() {
             <h1 className="text-3xl font-bold text-white">Email Outreach</h1>
           </div>
           <p className="text-slate-400">Send targeted emails to your group members</p>
+          {emailLimits && emailLimits.dailyLimit !== -1 && (
+            <div className="mt-3 flex items-center gap-4 text-sm">
+              <span className="text-slate-400">
+                Today: <span className={emailLimits.dailyUsed >= emailLimits.dailyLimit ? 'text-red-400 font-semibold' : 'text-white font-semibold'}>{emailLimits.dailyUsed}/{emailLimits.dailyLimit}</span> emails
+              </span>
+              <span className="text-slate-600">|</span>
+              <span className="text-slate-400">
+                This month: <span className={emailLimits.monthlyUsed >= emailLimits.monthlyLimit ? 'text-red-400 font-semibold' : 'text-white font-semibold'}>{emailLimits.monthlyUsed}/{emailLimits.monthlyLimit}</span> emails
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Success Message */}
@@ -261,6 +302,17 @@ export default function EmailPage() {
                   {sendStatus.errors.length > 3 && <li>...and {sendStatus.errors.length - 3} more</li>}
                 </ul>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Limit Error */}
+        {limitError && (
+          <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-500 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-yellow-200 font-semibold mb-1">Email limit reached</h3>
+              <p className="text-yellow-300 text-sm">{limitError}</p>
             </div>
           </div>
         )}
