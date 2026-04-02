@@ -199,7 +199,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                     member.fb_user_id
                       ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
                       : member.fb_profile_url
-                        ? member.fb_profile_url
+                        ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')}`
                         : `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
                   }
                   target="_blank"
@@ -207,7 +207,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                   className="flex items-center gap-2 w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium justify-center"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Open Profile' : 'Message on Facebook'}
+                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Send Message' : 'Message on Facebook'}
                 </a>
               </div>
             </div>

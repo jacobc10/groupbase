@@ -244,12 +244,20 @@
               ? fullHref
               : `https://www.facebook.com${href}`;
 
-            // Try to extract numeric user ID
+            // Try to extract numeric user ID or vanity username
             const idMatch = fullHref.match(
               /facebook\.com\/(?:profile\.php\?id=)?(\d+)/
             );
             if (idMatch) {
               memberData.fbUserId = idMatch[1];
+            } else {
+              // Extract vanity username (e.g. facebook.com/tony.roark)
+              const vanityMatch = fullHref.match(
+                /facebook\.com\/([a-zA-Z0-9._-]+)\/?(?:\?|$)/
+              );
+              if (vanityMatch && !['groups', 'pages', 'events', 'photo', 'photos', 'videos', 'watch', 'marketplace', 'gaming', 'search'].includes(vanityMatch[1])) {
+                memberData.fbUserId = vanityMatch[1];
+              }
             }
             break;
           }

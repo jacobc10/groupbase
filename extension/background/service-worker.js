@@ -363,7 +363,17 @@ async function sendMemberDataToSupabase(memberData, authToken, userId) {
       const match = memberData.profileUrl.match(
         /facebook\.com\/(?:profile\.php\?id=)?(\d+)/
       );
-      if (match) fbUserId = match[1];
+      if (match) {
+        fbUserId = match[1];
+      } else {
+        // Extract vanity username (e.g. facebook.com/tony.roark)
+        const vanityMatch = memberData.profileUrl.match(
+          /facebook\.com\/([a-zA-Z0-9._-]+)\/?(?:\?|$)/
+        );
+        if (vanityMatch && !['groups', 'pages', 'events', 'photo', 'photos', 'videos', 'watch', 'marketplace', 'gaming', 'search'].includes(vanityMatch[1])) {
+          fbUserId = vanityMatch[1];
+        }
+      }
     }
 
     const payload = {

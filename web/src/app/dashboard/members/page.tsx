@@ -579,13 +579,13 @@ export default function MembersPage() {
                             member.fb_user_id
                               ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
                               : member.fb_profile_url
-                                ? member.fb_profile_url
+                                ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')}`
                                 : `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
-                          title={member.fb_user_id ? 'Send Facebook Message' : member.fb_profile_url ? 'Open Facebook Profile' : 'Message on Facebook'}
+                          title={member.fb_user_id ? 'Send Facebook Message' : member.fb_profile_url ? 'Send Facebook Message' : 'Message on Facebook'}
                         >
                           <MessageCircle className="w-4 h-4 text-blue-600" />
                         </a>
