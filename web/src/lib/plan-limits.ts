@@ -130,9 +130,11 @@ export async function checkEmailLimit(userId: string, emailCount: number): Promi
 
   const plan = (profile?.plan as PlanKey) || 'free'
   const limits = PLAN_LIMITS[plan]
+  const dailyLimit = limits.emailsPerDay as number
+  const monthlyLimit = limits.emailsPerMonth as number
 
   // Unlimited emails
-  if (limits.emailsPerDay === -1 && limits.emailsPerMonth === -1) {
+  if (dailyLimit === -1 && monthlyLimit === -1) {
     return { allowed: true, dailyUsed: 0, dailyLimit: -1, monthlyUsed: 0, monthlyLimit: -1 }
   }
 
@@ -143,7 +145,7 @@ export async function checkEmailLimit(userId: string, emailCount: number): Promi
     .eq('owner_id', userId)
 
   if (!userGroups || userGroups.length === 0) {
-    return { allowed: true, dailyUsed: 0, dailyLimit: limits.emailsPerDay, monthlyUsed: 0, monthlyLimit: limits.emailsPerMonth }
+    return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit }
   }
 
   const groupIds = userGroups.map(g => g.id)
@@ -174,15 +176,15 @@ export async function checkEmailLimit(userId: string, emailCount: number): Promi
   const dailyUsed = dailyCount || 0
   const monthlyUsed = monthlyCount || 0
 
-  const dailyOk = limits.emailsPerDay === -1 || (dailyUsed + emailCount) <= limits.emailsPerDay
-  const monthlyOk = limits.emailsPerMonth === -1 || (monthlyUsed + emailCount) <= limits.emailsPerMonth
+  const dailyOk = dailyLimit === -1 || (dailyUsed + emailCount) <= dailyLimit
+  const monthlyOk = monthlyLimit === -1 || (monthlyUsed + emailCount) <= monthlyLimit
 
   return {
     allowed: dailyOk && monthlyOk,
     dailyUsed,
-    dailyLimit: limits.emailsPerDay,
+    dailyLimit,
     monthlyUsed,
-    monthlyLimit: limits.emailsPerMonth,
+    monthlyLimit,
   }
 }
 
