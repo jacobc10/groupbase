@@ -205,15 +205,30 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             </div>
 
             {member.fb_profile_url && (
-              <a
-                href={member.fb_profile_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                <ExternalLink className="w-4 h-4" />
-                View Facebook Profile
-              </a>
+              <div className="flex flex-wrap gap-4">
+                <a
+                  href={member.fb_profile_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Facebook Profile
+                </a>
+                <a
+                  href={
+                    member.fb_user_id
+                      ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
+                      : `${member.fb_profile_url.replace(/\/$/, '')}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Send Facebook Message
+                </a>
+              </div>
             )}
           </div>
 
