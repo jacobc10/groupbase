@@ -17,7 +17,7 @@ const CONFIG = {
   SUPABASE_REST_URL: 'https://bpbombdtzrthhbqoxlao.supabase.co/rest/v1',
   SUPABASE_ANON_KEY:
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwYm9tYmR0enJ0aGhicW94bGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzkxNDIsImV4cCI6MjA5MDY1NTE0Mn0.OSUerkMXCHRk2YiiSeflZryUvkV9dMeNVzahzzDtaZM',
-  DASHBOARD_URL: 'https://groupbase.vercel.app',
+  DASHBOARD_URL: 'https://usegroupbase.com',
   API_TIMEOUT: 10000,
   MAX_RETRIES: 3,
   RETRY_DELAY: 5000,

@@ -12,8 +12,8 @@
 'use strict';
 
 const CONFIG = {
-  DASHBOARD_URL: 'https://groupbase.vercel.app/dashboard',
-  SETTINGS_URL: 'https://groupbase.vercel.app/dashboard/integrations',
+  DASHBOARD_URL: 'https://usegroupbase.com/dashboard',
+  SETTINGS_URL: 'https://usegroupbase.com/dashboard/integrations',
   DEBUG: true,
 };
 
