@@ -71,7 +71,7 @@ export default function DashboardLayout({
     { label: 'Email', href: '/dashboard/email', icon: Mail },
     // { label: 'Automations', href: '/dashboard/automations', icon: Bot },
     // { label: 'Integrations', href: '/dashboard/integrations', icon: Zap },
-    // { label: 'Team', href: '/dashboard/team', icon: UserPlus },
+    { label: 'Team', href: '/dashboard/team', icon: UserPlus },
     { label: 'Settings', href: '/dashboard/settings', icon: Settings },
   ]
 
