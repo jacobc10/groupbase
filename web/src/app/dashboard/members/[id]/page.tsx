@@ -207,7 +207,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                   className="flex items-center gap-2 w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium justify-center"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Open Profile' : 'Find on Facebook'}
+                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Open Profile' : 'Message on Facebook'}
                 </a>
               </div>
             </div>
