@@ -20,7 +20,7 @@ export const PLANS = {
       groups: 1,
       membersPerGroup: 100,
       integrations: 0,
-      teamMembers: 1,
+      teamMembers: 2,
       csvExport: false,
       emailsPerDay: 5,
       emailsPerMonth: 150,
@@ -42,7 +42,7 @@ export const PLANS = {
       groups: 3,
       membersPerGroup: -1, // unlimited
       integrations: 5,
-      teamMembers: 3,
+      teamMembers: 30,
       csvExport: true,
       emailsPerDay: -1, // unlimited
       emailsPerMonth: -1,
@@ -65,7 +65,7 @@ export const PLANS = {
       groups: -1, // unlimited
       membersPerGroup: -1,
       integrations: -1,
-      teamMembers: -1,
+      teamMembers: 100,
       csvExport: true,
       emailsPerDay: -1, // unlimited
       emailsPerMonth: -1,

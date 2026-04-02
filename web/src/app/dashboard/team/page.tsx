@@ -21,11 +21,7 @@ type TeamData = {
   plan_seat_limit: number
 }
 
-const PLAN_SEAT_LIMITS: Record<string, number> = {
-  free: 1,
-  pro: 3,
-  enterprise: Infinity,
-}
+// Seat limits now come from the API response (plan_seat_limit field)
 
 const ROLE_COLORS = {
   owner: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
@@ -158,8 +154,8 @@ export default function TeamPage() {
 
   const isOwner = teamData.current_user_role === 'owner'
   const seatsUsed = teamData.members.length
-  const seatLimit = PLAN_SEAT_LIMITS[teamData.plan] || 1
-  const seatsAvailable = seatLimit === Infinity ? Infinity : seatLimit - seatsUsed
+  const seatLimit = teamData.plan_seat_limit
+  const seatsAvailable = seatLimit - seatsUsed
   const canInvite = seatsAvailable > 0
 
   return (
@@ -205,17 +201,11 @@ export default function TeamPage() {
           {/* Seat Limit Info */}
           <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
             <p className="text-sm text-indigo-800 dark:text-indigo-300">
-              {seatLimit === Infinity ? (
-                <>Unlimited seats available</>
-              ) : (
-                <>
-                  {seatsUsed} of {seatLimit} seats used
-                  {seatsAvailable === 0 && (
-                    <span className="block mt-1 font-semibold">
-                      Upgrade your plan to add more team members
-                    </span>
-                  )}
-                </>
+              {seatsUsed} of {seatLimit} seats used
+              {seatsAvailable <= 0 && (
+                <span className="block mt-1 font-semibold">
+                  Upgrade your plan to add more team members
+                </span>
               )}
             </p>
           </div>

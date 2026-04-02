@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getUserPlan, getLimits } from '@/lib/plan-limits'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
@@ -7,7 +10,12 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Check if user has a team
+    // Get user's plan
+    const plan = await getUserPlan()
+    const limits = getLimits(plan)
+    const seatLimit = limits.teamMembers as number
+
+    // Check if user has a team (as owner)
     let { data: teamData, error: teamError } = await supabase
       .from('teams')
       .select('id, name, owner_id')
@@ -33,10 +41,31 @@ export async function GET() {
 
       teamData = newTeam
     } else if (teamError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch team' },
-        { status: 500 }
-      )
+      // Maybe user is a member of another team, not owner
+      const { data: membership } = await supabase
+        .from('team_members')
+        .select('team_id, role')
+        .eq('user_id', user.id)
+        .single()
+
+      if (membership) {
+        const { data: memberTeam } = await supabase
+          .from('teams')
+          .select('id, name, owner_id')
+          .eq('id', membership.team_id)
+          .single()
+
+        if (memberTeam) {
+          teamData = memberTeam
+        }
+      }
+
+      if (!teamData) {
+        return NextResponse.json(
+          { error: 'Failed to fetch team' },
+          { status: 500 }
+        )
+      }
     }
 
     // Get team members with profile info
@@ -58,168 +87,64 @@ export async function GET() {
       )
     }
 
-    // Format members response
-    const formattedMembers = members.map((member: any) => ({
-      id: member.id,
-      user_id: member.user_id,
-      role: member.role,
-      email: member.profiles?.email,
-      full_name: member.profiles?.full_name,
-      created_at: member.created_at,
-    }))
+    // Get owner's profile info
+    const { data: ownerProfile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', teamData!.owner_id)
+      .single()
+
+    // Build members list - owner first, then team_members
+    const formattedMembers = []
+
+    // Add owner as first member
+    formattedMembers.push({
+      id: teamData!.owner_id,
+      full_name: ownerProfile?.full_name || null,
+      email: ownerProfile?.email || user.email || '',
+      role: 'owner' as const,
+      created_at: teamData!.owner_id === user.id ? user.created_at : '',
+    })
+
+    // Add other team members
+    for (const member of (members || [])) {
+      const profile = Array.isArray((member as any).profiles)
+        ? (member as any).profiles[0]
+        : (member as any).profiles
+
+      // Skip if this is the owner (already added)
+      if (member.user_id === teamData!.owner_id) continue
+
+      formattedMembers.push({
+        id: member.user_id,
+        full_name: profile?.full_name || null,
+        email: profile?.email || '',
+        role: member.role,
+        created_at: member.created_at,
+      })
+    }
+
+    // Determine current user's role
+    let currentUserRole: 'owner' | 'admin' | 'member' = 'member'
+    if (teamData!.owner_id === user.id) {
+      currentUserRole = 'owner'
+    } else {
+      const userMembership = (members || []).find((m: any) => m.user_id === user.id)
+      if (userMembership) {
+        currentUserRole = userMembership.role as 'admin' | 'member'
+      }
+    }
 
     return NextResponse.json({
-      team: teamData,
+      team_name: teamData!.name,
       members: formattedMembers,
+      current_user_id: user.id,
+      current_user_role: currentUserRole,
+      plan,
+      plan_seat_limit: seatLimit,
     })
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const body = await request.json()
-    const { email, role } = body
-
-    if (!email || !role) {
-      return NextResponse.json(
-        { error: 'Email and role are required' },
-        { status: 400 }
-      )
-    }
-
-    if (!['admin', 'member'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role. Must be admin or member' },
-        { status: 400 }
-      )
-    }
-
-    // Get user's team
-    const { data: team, error: teamError } = await supabase
-      .from('teams')
-      .select('id, owner_id')
-      .eq('owner_id', user.id)
-      .single()
-
-    if (teamError || !team) {
-      return NextResponse.json(
-        { error: 'Team not found' },
-        { status: 404 }
-      )
-    }
-
-    // Only owner can invite
-    if (team.owner_id !== user.id) {
-      return NextResponse.json(
-        { error: 'Only team owner can invite members' },
-        { status: 403 }
-      )
-    }
-
-    // Get user's profile to check plan
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('plan')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !userProfile) {
-      return NextResponse.json(
-        { error: 'User profile not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check plan limits
-    const { count: memberCount } = await supabase
-      .from('team_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('team_id', team.id)
-
-    const allowedMembers =
-      userProfile.plan === 'enterprise'
-        ? Infinity
-        : userProfile.plan === 'pro'
-        ? 3
-        : 0
-
-    if (memberCount! >= allowedMembers) {
-      return NextResponse.json(
-        { error: `Plan limit reached. ${userProfile.plan} plan allows ${allowedMembers === Infinity ? 'unlimited' : allowedMembers} members` },
-        { status: 403 }
-      )
-    }
-
-    // Look up invited user by email
-    const { data: invitedUser, error: userLookupError } = await supabase
-      .from('profiles')
-      .select('id, email, full_name')
-      .eq('email', email)
-      .single()
-
-    if (userLookupError || !invitedUser) {
-      return NextResponse.json(
-        { error: 'User not found. They need to sign up first.' },
-        { status: 404 }
-      )
-    }
-
-    // Check if already a member
-    const { data: existingMember } = await supabase
-      .from('team_members')
-      .select('id')
-      .eq('team_id', team.id)
-      .eq('user_id', invitedUser.id)
-      .single()
-
-    if (existingMember) {
-      return NextResponse.json(
-        { error: 'User is already a team member' },
-        { status: 409 }
-      )
-    }
-
-    // Add team member
-    const { data: newMember, error: insertError } = await supabase
-      .from('team_members')
-      .insert([
-        {
-          team_id: team.id,
-          user_id: invitedUser.id,
-          role,
-        },
-      ])
-      .select()
-      .single()
-
-    if (insertError) {
-      return NextResponse.json(
-        { error: 'Failed to add team member' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        id: newMember.id,
-        user_id: newMember.user_id,
-        role: newMember.role,
-        email: invitedUser.email,
-        full_name: invitedUser.full_name,
-        created_at: newMember.created_at,
-      },
-      { status: 201 }
-    )
-  } catch (error) {
+    console.error('Team API error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
