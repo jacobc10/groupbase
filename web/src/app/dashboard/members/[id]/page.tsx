@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageSquare,
+  ArrowLeft, ExternalLink, Mail, MessageCircle, Phone, Tag, Clock, User, MessageSquare,
   Loader2, Save, Trash2, X, Plus
 } from 'lucide-react'
 import type { Member, ActivityLog, MemberStatus } from '@/types/database'
@@ -192,15 +192,23 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  <Phone className="w-4 h-4 inline mr-1" /> Phone
+                  <MessageCircle className="w-4 h-4 inline mr-1" /> Facebook Message
                 </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="No phone captured"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <a
+                  href={
+                    member.fb_user_id
+                      ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
+                      : member.fb_profile_url
+                        ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')}`
+                        : `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium justify-center"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Send Message' : 'Message on Facebook'}
+                </a>
               </div>
             </div>
 
