@@ -192,3 +192,69 @@
     opacity: 0.5;
   }
 }
+
+/* ============================================
+   BATCH APPROVE BUTTON & STATUS
+   ============================================ */
+
+.groupbase-batch-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+
+.groupbase-batch-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.groupbase-batch-btn:active {
+  transform: translateY(0);
+}
+
+.groupbase-batch-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+}
+
+.groupbase-batch-btn.done {
+  background: rgba(72, 187, 120, 0.3);
+  border-color: rgba(72, 187, 120, 0.6);
+}
+
+.groupbase-batch-cancel {
+  background: rgba(252, 129, 129, 0.3);
+  border: 1px solid rgba(252, 129, 129, 0.5);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.groupbase-batch-cancel:hover {
+  background: rgba(252, 129, 129, 0.5);
+}
+
+.groupbase-batch-status {
+  font-size: 10px;
+  opacity: 0.85;
+  font-weight: 400;
+  margin-top: 1px;
+}
