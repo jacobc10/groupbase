@@ -17,7 +17,7 @@ const CONFIG = {
   SUPABASE_REST_URL: 'https://bpbombdtzrthhbqoxlao.supabase.co/rest/v1',
   SUPABASE_ANON_KEY:
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwYm9tYmR0enJ0aGhicW94bGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzkxNDIsImV4cCI6MjA5MDY1NTE0Mn0.OSUerkMXCHRk2YiiSeflZryUvkV9dMeNVzahzzDtaZM',
-  DASHBOARD_URL: 'https://usegroupbase.com',
+  DASHBOARD_URL: 'https://groupbase.vercel.app',
   API_TIMEOUT: 10000,
   MAX_RETRIES: 3,
   RETRY_DELAY: 5000,
@@ -294,7 +294,7 @@ async function findOrCreateGroup(authToken, userId, fbGroupInfo) {
 
     // Strategy 4: Create new group only if we have a valid FB group name
     if (!nameIsValid) {
-      logger.error('Cannot create group — invalid or missing FB group name:', fbGroupName);
+      logger.error('Cannot create group â invalid or missing FB group name:', fbGroupName);
       throw new Error('Could not determine Facebook group. Please navigate to your Facebook group page and try again.');
     }
     logger.log('Creating new group:', fbGroupName);
@@ -363,15 +363,19 @@ async function sendMemberDataToSupabase(memberData, authToken, userId) {
       const match = memberData.profileUrl.match(
         /facebook\.com\/(?:profile\.php\?id=)?(\d+)/
       );
-      if (match) {
-        fbUserId = match[1];
-      } else {
-        // Extract vanity username (e.g. facebook.com/tony.roark)
-        const vanityMatch = memberData.profileUrl.match(
-          /facebook\.com\/([a-zA-Z0-9._-]+)\/?(?:\?|$)/
-        );
-        if (vanityMatch && !['groups', 'pages', 'events', 'photo', 'photos', 'videos', 'watch', 'marketplace', 'gaming', 'search'].includes(vanityMatch[1])) {
-          fbUserId = vanityMatch[1];
+      if (match) fbUserId = match[1];
+    }
+
+    // Auto-detect email from answers if not already set
+    let email = memberData.email || null;
+    if (!email && Array.isArray(memberData.answers)) {
+      const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+      for (const ans of memberData.answers) {
+        const text = typeof ans === 'string' ? ans : (ans?.answer || '');
+        const match = text.match(emailRegex);
+        if (match) {
+          email = match[0].toLowerCase();
+          break;
         }
       }
     }
@@ -379,6 +383,7 @@ async function sendMemberDataToSupabase(memberData, authToken, userId) {
     const payload = {
       group_id: groupId,
       name: memberData.name || 'Unknown',
+      email: email,
       fb_profile_url: memberData.profileUrl || null,
       fb_user_id: fbUserId,
       answers: memberData.answers || [],
@@ -409,7 +414,7 @@ async function sendMemberDataToSupabase(memberData, authToken, userId) {
           return sendMemberDataToSupabase(memberData, refreshed.token, refreshed.userId);
         }
         await clearAuthData();
-        throw new Error('Authentication failed — please sign in again');
+        throw new Error('Authentication failed â please sign in again');
       }
       const errBody = await response.text();
       throw new Error(`API request failed: ${response.status} ${errBody}`);
