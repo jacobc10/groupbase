@@ -70,7 +70,7 @@ export default function DashboardLayout({
     { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     { label: 'Email', href: '/dashboard/email', icon: Mail },
     // { label: 'Automations', href: '/dashboard/automations', icon: Bot },
-    // { label: 'Integrations', href: '/dashboard/integrations', icon: Zap },
+    { label: 'Integrations', href: '/dashboard/integrations', icon: Zap },
     { label: 'Team', href: '/dashboard/team', icon: UserPlus },
     { label: 'Settings', href: '/dashboard/settings', icon: Settings },
   ]
