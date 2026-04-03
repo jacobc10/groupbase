@@ -575,6 +575,227 @@
   }
 
   // ============================================
+  // BATCH APPROVE
+  // ============================================
+
+  let batchApproveRunning = false;
+
+  /**
+   * Find all visible Approve buttons on the page.
+   * Scans for buttons/roles matching our approve detection, excluding
+   * any that have already been clicked (Facebook usually removes them).
+   */
+  function findAllApproveButtons() {
+    const candidates = document.querySelectorAll(
+      '[role="button"], button, [aria-label]'
+    );
+    const approveButtons = [];
+
+    for (const el of candidates) {
+      if (isApproveButton(el)) {
+        // Make sure it's visible and not already processed
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          approveButtons.push(el);
+        }
+      }
+    }
+
+    // Deduplicate — a span inside a button may both match; keep the outermost
+    const unique = [];
+    for (const btn of approveButtons) {
+      const dominated = approveButtons.some(
+        (other) => other !== btn && other.contains(btn)
+      );
+      if (!dominated) unique.push(btn);
+    }
+
+    return unique;
+  }
+
+  /**
+   * Scroll the page to load more member requests.
+   * Returns true if new content was loaded.
+   */
+  async function scrollToLoadMore() {
+    const before = document.querySelectorAll('[role="listitem"], [role="article"], [role="row"]').length;
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise((r) => setTimeout(r, 1500));
+    const after = document.querySelectorAll('[role="listitem"], [role="article"], [role="row"]').length;
+    return after > before;
+  }
+
+  /**
+   * Batch-approve all pending members on the page.
+   * Clicks each Approve button sequentially with a delay between clicks
+   * so the existing capture flow can process each member.
+   */
+  async function batchApproveAll() {
+    if (batchApproveRunning) {
+      logger.warn('Batch approve already running');
+      return;
+    }
+
+    // Check auth first
+    const authState = await checkAuthStatus();
+    if (!authState.authenticated) {
+      showNotification('Sign in to GroupBase extension first', 'error');
+      return;
+    }
+
+    batchApproveRunning = true;
+    updateBatchUI('starting');
+
+    let totalApproved = 0;
+    let round = 0;
+    const MAX_ROUNDS = 20; // safety cap to avoid infinite loops
+
+    try {
+      while (round < MAX_ROUNDS) {
+        round++;
+        const buttons = findAllApproveButtons();
+
+        if (buttons.length === 0) {
+          // Try scrolling to load more
+          logger.log('No approve buttons found, scrolling to load more...');
+          const loaded = await scrollToLoadMore();
+          if (!loaded) {
+            logger.log('No more content to load, batch complete');
+            break;
+          }
+          // Re-check after scroll
+          const afterScroll = findAllApproveButtons();
+          if (afterScroll.length === 0) break;
+          // Continue loop to process newly loaded buttons
+          continue;
+        }
+
+        logger.log(`Batch round ${round}: found ${buttons.length} approve buttons`);
+        updateBatchUI('running', totalApproved, totalApproved + buttons.length);
+
+        for (let i = 0; i < buttons.length; i++) {
+          if (!batchApproveRunning) {
+            logger.log('Batch approve cancelled by user');
+            updateBatchUI('cancelled', totalApproved);
+            return;
+          }
+
+          const btn = buttons[i];
+
+          // Scroll button into view
+          btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          await new Promise((r) => setTimeout(r, 300));
+
+          // Find the member container BEFORE clicking (it may disappear after)
+          const container = findMemberContainer(btn);
+          let memberData = null;
+          if (container) {
+            memberData = extractMemberData(container);
+          }
+
+          // Click the approve button
+          btn.click();
+          logger.log(`Clicked approve button ${i + 1}/${buttons.length}`);
+
+          // If we got member data, send it to background
+          if (memberData && memberData.name) {
+            const dedupeKey = `${memberData.name}-${memberData.profileUrl || ''}`;
+            if (!capturedMembers.has(dedupeKey)) {
+              capturedMembers.add(dedupeKey);
+              const result = await sendMemberDataToBackground(memberData);
+              if (result.success) {
+                if (container) injectApprovedBadge(container);
+                updateCaptureCount();
+              }
+            }
+          }
+
+          totalApproved++;
+          updateBatchUI('running', totalApproved);
+
+          // Delay between clicks to let Facebook process
+          await new Promise((r) => setTimeout(r, 800));
+        }
+
+        // Brief pause between rounds, then scroll to load more
+        await new Promise((r) => setTimeout(r, 500));
+        const loaded = await scrollToLoadMore();
+        if (!loaded) break;
+      }
+
+      updateBatchUI('done', totalApproved);
+      showNotification(`\u2713 Batch complete \u2014 ${totalApproved} member${totalApproved !== 1 ? 's' : ''} approved`);
+      logger.log(`Batch approve complete: ${totalApproved} members approved`);
+    } catch (error) {
+      logger.error('Batch approve error:', error);
+      updateBatchUI('error', totalApproved);
+      showNotification('Batch approve encountered an error', 'error');
+    } finally {
+      batchApproveRunning = false;
+    }
+  }
+
+  /**
+   * Update the batch-approve UI in the banner.
+   * States: starting, running, done, cancelled, error
+   */
+  function updateBatchUI(state, count = 0, total = null) {
+    const statusEl = document.getElementById('groupbase-batch-status');
+    const btn = document.getElementById('groupbase-batch-btn');
+    const cancelBtn = document.getElementById('groupbase-batch-cancel');
+
+    if (state === 'starting') {
+      if (btn) btn.style.display = 'none';
+      if (cancelBtn) cancelBtn.style.display = 'inline-block';
+      if (statusEl) {
+        statusEl.textContent = 'Scanning for members\u2026';
+        statusEl.style.display = 'block';
+      }
+    } else if (state === 'running') {
+      if (statusEl) {
+        statusEl.textContent = total
+          ? `Approving\u2026 ${count}/${total}`
+          : `Approved: ${count}`;
+        statusEl.style.display = 'block';
+      }
+    } else if (state === 'done') {
+      if (btn) {
+        btn.style.display = 'inline-block';
+        btn.textContent = '\u2713 Done';
+        btn.disabled = true;
+        btn.classList.add('done');
+      }
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      if (statusEl) {
+        statusEl.textContent = `${count} member${count !== 1 ? 's' : ''} approved`;
+        statusEl.style.display = 'block';
+      }
+      // Re-enable button after 5s for another run
+      setTimeout(() => {
+        if (btn) {
+          btn.textContent = 'Approve All';
+          btn.disabled = false;
+          btn.classList.remove('done');
+        }
+      }, 5000);
+    } else if (state === 'cancelled') {
+      if (btn) btn.style.display = 'inline-block';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      if (statusEl) {
+        statusEl.textContent = `Cancelled after ${count}`;
+        statusEl.style.display = 'block';
+      }
+    } else if (state === 'error') {
+      if (btn) btn.style.display = 'inline-block';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      if (statusEl) {
+        statusEl.textContent = `Error after ${count} approved`;
+        statusEl.style.display = 'block';
+      }
+    }
+  }
+
+  // ============================================
   // STATUS BANNER
   // ============================================
 
@@ -596,6 +817,10 @@
     banner.id = 'groupbase-banner';
     banner.className = 'groupbase-banner';
 
+    const isMemberRequestsPage =
+      window.location.pathname.includes('member-requests') ||
+      window.location.pathname.includes('members/pending');
+
     banner.innerHTML = `
       <div class="groupbase-banner-dot ${isAuthenticated ? '' : 'disconnected'}"></div>
       <div class="groupbase-banner-logo">G</div>
@@ -606,12 +831,37 @@
             ? 'Approvals will be captured automatically'
             : 'Click extension icon to sign in'
         }</span>
+        <span id="groupbase-batch-status" class="groupbase-batch-status" style="display:none;"></span>
       </div>
+      ${
+        isAuthenticated && isMemberRequestsPage
+          ? `<button id="groupbase-batch-btn" class="groupbase-batch-btn" title="Approve all pending members">Approve All</button>
+             <button id="groupbase-batch-cancel" class="groupbase-batch-cancel" style="display:none;" title="Stop batch approve">Stop</button>`
+          : ''
+      }
       <span id="groupbase-capture-count" class="groupbase-banner-counter" style="display:none;">0</span>
       <button class="groupbase-banner-close" title="Minimize">×</button>
     `;
 
     document.body.appendChild(banner);
+
+    // Batch approve button
+    const batchBtn = banner.querySelector('#groupbase-batch-btn');
+    if (batchBtn) {
+      batchBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        batchApproveAll();
+      });
+    }
+
+    // Cancel batch button
+    const cancelBtn = banner.querySelector('#groupbase-batch-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        batchApproveRunning = false;
+      });
+    }
 
     // Close button minimizes to small dot
     const closeBtn = banner.querySelector('.groupbase-banner-close');
