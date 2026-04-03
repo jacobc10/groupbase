@@ -164,7 +164,7 @@
       // Facebook uses data-visualcompletion on card containers
       if (container.hasAttribute('data-visualcompletion')) {
         bestContainer = container;
-        // Don't break — keep looking for a better semantic container
+        // Don't break â keep looking for a better semantic container
       }
 
       // Look for containers that have both a profile link and approve/decline buttons
@@ -244,20 +244,12 @@
               ? fullHref
               : `https://www.facebook.com${href}`;
 
-            // Try to extract numeric user ID or vanity username
+            // Try to extract numeric user ID
             const idMatch = fullHref.match(
               /facebook\.com\/(?:profile\.php\?id=)?(\d+)/
             );
             if (idMatch) {
               memberData.fbUserId = idMatch[1];
-            } else {
-              // Extract vanity username (e.g. facebook.com/tony.roark)
-              const vanityMatch = fullHref.match(
-                /facebook\.com\/([a-zA-Z0-9._-]+)\/?(?:\?|$)/
-              );
-              if (vanityMatch && !['groups', 'pages', 'events', 'photo', 'photos', 'videos', 'watch', 'marketplace', 'gaming', 'search'].includes(vanityMatch[1])) {
-                memberData.fbUserId = vanityMatch[1];
-              }
             }
             break;
           }
@@ -283,9 +275,16 @@
       }
 
       // --- Extract membership question answers ---
-      // Facebook shows Q&A in the member request card.
-      // Questions are usually in bold/strong, answers follow.
-      const allText = [];
+      // Facebook renders Q&A pairs in the member request card.
+      // We look for question-answer patterns in the DOM structure.
+
+      // Strategy 1: Look for Q&A container sections
+      // Facebook typically renders questions as bold/semibold spans
+      // with answers as subsequent text elements
+      const qaPairs = [];
+
+      // Collect all visible text elements with their DOM context
+      const textElements = [];
       const walker = document.createTreeWalker(
         memberContainer,
         NodeFilter.SHOW_TEXT,
@@ -294,44 +293,144 @@
       );
 
       while (walker.nextNode()) {
-        const text = walker.currentNode.textContent?.trim();
-        if (text && text.length > 3 && text.length < 1000) {
-          allText.push(text);
+        const node = walker.currentNode;
+        const text = node.textContent?.trim();
+        if (!text || text.length < 2) continue;
+
+        // Get the parent element for context
+        const parent = node.parentElement;
+        if (!parent) continue;
+
+        // Skip hidden elements
+        const style = window.getComputedStyle(parent);
+        if (style.display === 'none' || style.visibility === 'hidden') continue;
+
+        // Skip elements that are accessibility-only (screen reader text)
+        if (parent.closest('[aria-hidden="true"]')) continue;
+
+        textElements.push({
+          text,
+          parent,
+          isBold: style.fontWeight >= 600 || parent.tagName === 'STRONG' || parent.tagName === 'B',
+          isSmall: parseFloat(style.fontSize) < 13,
+          role: parent.getAttribute('role') || parent.closest('[role]')?.getAttribute('role') || '',
+          ariaLabel: parent.getAttribute('aria-label') || '',
+        });
+      }
+
+      // Aggressive filter: remove all known garbage patterns
+      const isGarbage = (text) => {
+        // Exact matches to skip
+        const exactSkips = new Set([
+          memberData.name,
+          'Approve', 'Decline', 'Report', 'Delete', 'Block', 'More', 'Edit',
+          'Requested', 'Pending', 'Approved', 'Declined',
+          groupInfo.fbGroupName,
+          'Member requests', 'No pending members',
+          'Questions', 'Gender', 'Request age', 'Join Facebook date',
+          'More filters', 'Clear filters', 'Newest first',
+          'Joined Facebook', 'Lives in', 'From', 'Works at',
+          'Question 1', 'Question 2', 'Question 3',
+        ]);
+        if (exactSkips.has(text)) return true;
+
+        // Pattern matches to skip
+        const garbagePatterns = [
+          /^Accessibility label:/i,
+          /^\d+ (hours?|minutes?|days?|weeks?|months?|years?) ago$/i,
+          /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/,
+          /^\d+ (groups?|friends?|mutual) in common$/i,
+          /^\d+ other groups?$/i,
+          /^\d+ mutual friends?$/i,
+          /^(Joined|Created|Founded)\s/i,
+          /^(\d+\s)?(years?|months?|weeks?|days?)\s*ago$/i,
+          /^(Admin|Moderator|Member|New member|Group expert)$/i,
+          /^(Co-host|Host|Contributor)(\s|$)/i,
+          /^(View profile|See more|Show more|View all)/i,
+          /button/i,
+          /^Reply$/i,
+          /^Like$/i,
+          /^Share$/i,
+          /^Comment$/i,
+          /^Write (a |your )?/i,
+          /^Add a comment/i,
+          /^\d+$/,  // Pure numbers
+          /^[Â·â¢\-ââ]$/,  // Bullets/separators
+        ];
+        return garbagePatterns.some(p => p.test(text));
+      };
+
+      // Filter to only meaningful text
+      const meaningfulTexts = textElements.filter(el => {
+        if (isGarbage(el.text)) return false;
+        if (el.text.length < 3) return false;
+        if (el.role === 'button') return false;
+        if (el.ariaLabel && el.ariaLabel.length > 0) return false;  // Skip aria-labeled elements (buttons)
+        return true;
+      });
+
+      // Strategy 2: Try to identify Q&A pairs by looking for question-like text
+      // Questions typically end with "?" or are bold text followed by answer text
+      const questionPattern = /\?(\s|$)/;
+      let currentQuestion = null;
+      let currentAnswers = [];
+
+      for (let i = 0; i < meaningfulTexts.length; i++) {
+        const el = meaningfulTexts[i];
+        const text = el.text;
+
+        // Is this a question? (ends with ? or is bold text that looks like a question)
+        if (questionPattern.test(text) || (el.isBold && text.length > 15)) {
+          // Save previous Q&A pair if exists
+          if (currentQuestion && currentAnswers.length > 0) {
+            qaPairs.push({
+              question: currentQuestion,
+              answer: currentAnswers.join(' '),
+            });
+          }
+          currentQuestion = text;
+          currentAnswers = [];
+        } else if (currentQuestion) {
+          // This text follows a question â it's likely an answer
+          currentAnswers.push(text);
+        } else {
+          // Text before any question â could still be an answer if it's meaningful
+          // Store as answer-only (no question paired)
+          if (text.length > 3) {
+            qaPairs.push({
+              question: null,
+              answer: text,
+            });
+          }
         }
       }
 
-      // Filter out known non-answer texts
-      const skipTexts = new Set([
-        memberData.name,
-        'Approve',
-        'Decline',
-        'Report',
-        'Delete',
-        'Block',
-        'More',
-        'Edit',
-        groupInfo.fbGroupName,
-        'Member requests',
-        'No pending members',
-      ]);
-
-      const answers = [];
-      for (const text of allText) {
-        if (
-          !skipTexts.has(text) &&
-          text.length > 5 &&
-          // Skip if it looks like a date/time string
-          !/^\d+ (hours?|minutes?|days?|weeks?) ago$/.test(text) &&
-          !/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/.test(text) &&
-          // Skip filter labels
-          !['Questions', 'Gender', 'Request age', 'Join Facebook date', 'More filters', 'Clear filters', 'Newest first'].includes(text)
-        ) {
-          answers.push(text);
-        }
+      // Don't forget the last Q&A pair
+      if (currentQuestion && currentAnswers.length > 0) {
+        qaPairs.push({
+          question: currentQuestion,
+          answer: currentAnswers.join(' '),
+        });
+      } else if (currentQuestion) {
+        // Question with no answer
+        qaPairs.push({
+          question: currentQuestion,
+          answer: '(no answer provided)',
+        });
       }
 
-      // Deduplicate and limit answers
-      memberData.answers = [...new Set(answers)].slice(0, 10);
+      // Store as Q&A pair objects
+      memberData.answers = qaPairs.slice(0, 10);
+
+      // Auto-detect email from answers and store in memberData
+      const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+      for (const qa of qaPairs) {
+        const emailMatch = qa.answer.match(emailRegex);
+        if (emailMatch) {
+          memberData.email = emailMatch[0].toLowerCase();
+          break;
+        }
+      }
 
       logger.log('Extracted member data:', memberData);
       return memberData;
@@ -492,7 +591,7 @@
       if (result.success) {
         injectApprovedBadge(container);
         updateCaptureCount();
-        showNotification(`✓ ${memberData.name} captured by GroupBase`);
+        showNotification(`â ${memberData.name} captured by GroupBase`);
         logger.log('Member captured successfully:', memberData.name);
       } else {
         if (result.queued) {
@@ -601,7 +700,7 @@
       }
     }
 
-    // Deduplicate — a span inside a button may both match; keep the outermost
+    // Deduplicate â a span inside a button may both match; keep the outermost
     const unique = [];
     for (const btn of approveButtons) {
       const dominated = approveButtons.some(
@@ -724,7 +823,7 @@
       }
 
       updateBatchUI('done', totalApproved);
-      showNotification(`\u2713 Batch complete \u2014 ${totalApproved} member${totalApproved !== 1 ? 's' : ''} approved`);
+      showNotification(`â Batch complete â ${totalApproved} member${totalApproved !== 1 ? 's' : ''} approved`);
       logger.log(`Batch approve complete: ${totalApproved} members approved`);
     } catch (error) {
       logger.error('Batch approve error:', error);
@@ -748,20 +847,20 @@
       if (btn) btn.style.display = 'none';
       if (cancelBtn) cancelBtn.style.display = 'inline-block';
       if (statusEl) {
-        statusEl.textContent = 'Scanning for members\u2026';
+        statusEl.textContent = 'Scanning for membersâ¦';
         statusEl.style.display = 'block';
       }
     } else if (state === 'running') {
       if (statusEl) {
         statusEl.textContent = total
-          ? `Approving\u2026 ${count}/${total}`
+          ? `Approvingâ¦ ${count}/${total}`
           : `Approved: ${count}`;
         statusEl.style.display = 'block';
       }
     } else if (state === 'done') {
       if (btn) {
         btn.style.display = 'inline-block';
-        btn.textContent = '\u2713 Done';
+        btn.textContent = 'â Done';
         btn.disabled = true;
         btn.classList.add('done');
       }
@@ -840,7 +939,7 @@
           : ''
       }
       <span id="groupbase-capture-count" class="groupbase-banner-counter" style="display:none;">0</span>
-      <button class="groupbase-banner-close" title="Minimize">×</button>
+      <button class="groupbase-banner-close" title="Minimize">Ã</button>
     `;
 
     document.body.appendChild(banner);
@@ -958,7 +1057,7 @@
       showStatusBanner();
     }
 
-    logger.log('GroupBase content script ready — listening for Approve clicks');
+    logger.log('GroupBase content script ready â listening for Approve clicks');
   }
 
   if (document.readyState === 'loading') {
