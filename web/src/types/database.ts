@@ -58,7 +58,7 @@ export interface Member {
   name: string
   email: string | null
   phone: string | null
-  answers: Record<string, string>[] | string[]
+  answers: Array<{ question?: string | null; answer: string }> | string[]
   tags: string[]
   status: MemberStatus
   assigned_to: string | null
