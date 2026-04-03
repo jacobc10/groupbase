@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageCircle, MessageSquare,
+  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageSquare,
   Loader2, Save, Trash2, X, Plus
 } from 'lucide-react'
 import type { Member, ActivityLog, MemberStatus } from '@/types/database'
@@ -192,57 +192,64 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  <MessageCircle className="w-4 h-4 inline mr-1" /> Facebook Message
+                  <Phone className="w-4 h-4 inline mr-1" /> Phone
                 </label>
-                <a
-                  href={
-                    member.fb_user_id
-                      ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
-                      : member.fb_profile_url
-                        ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')}`
-                        : `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium justify-center"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Send Message' : 'Message on Facebook'}
-                </a>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="No phone captured"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-4">
-              {member.fb_profile_url && (
-                <a
-                  href={member.fb_profile_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Facebook Profile
-                </a>
-              )}
-              {phone && (
-                <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                  <Phone className="w-4 h-4" />
-                  {phone}
-                </span>
-              )}
-            </div>
+            {member.fb_profile_url && (
+              <a
+                href={member.fb_profile_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Facebook Profile
+              </a>
+            )}
           </div>
 
           {/* Membership Answers */}
           {member.answers && (Array.isArray(member.answers) ? member.answers.length > 0 : false) && (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
               <h2 className="text-lg font-bold">Membership Answers</h2>
-              <div className="space-y-2">
-                {(member.answers as string[]).map((answer, i) => (
-                  <div key={i} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm">
-                    {typeof answer === 'string' ? answer : JSON.stringify(answer)}
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {(member.answers as Array<string | { question?: string | null; answer?: string }>).map((item, i) => {
+                  // Handle both old format (string[]) and new format ({question, answer}[])
+                  const isQAPair = typeof item === 'object' && item !== null && 'answer' in item;
+                  const question = isQAPair ? (item as { question?: string | null; answer?: string }).question : null;
+                  const answer = isQAPair ? (item as { question?: string | null; answer?: string }).answer || '' : (typeof item === 'string' ? item : JSON.stringify(item));
+
+                  // Check if answer contains an email
+                  const emailMatch = answer.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+
+                  return (
+                    <div key={i} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                      {question && (
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                          {question}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {emailMatch ? (
+                          <a href={`mailto:${emailMatch[0]}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {answer}
+                          </a>
+                        ) : (
+                          answer
+                        )}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -341,7 +348,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                       {activity.details && Object.keys(activity.details).length > 0 && (
                         <p className="text-gray-500 text-xs">
                           {activity.action === 'status_changed'
-                            ? `${(activity.details as Record<string, string>).from} → ${(activity.details as Record<string, string>).to}`
+                            ? `${(activity.details as Record<string, string>).from} â ${(activity.details as Record<string, string>).to}`
                             : JSON.stringify(activity.details)}
                         </p>
                       )}
