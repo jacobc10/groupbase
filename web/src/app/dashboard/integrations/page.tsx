@@ -41,8 +41,8 @@ const INTEGRATION_META = {
     color: 'bg-purple-100 dark:bg-purple-900',
     iconColor: 'text-purple-600 dark:text-purple-400',
     configFields: [
-      { key: 'url', label: 'Webhook URL', type: 'url', placeholder: 'https://your-server.com/webhook', required: true },
-      { key: 'secret', label: 'Signing Secret (optional)', type: 'text', placeholder: 'whsec_...', required: false },
+      { key: 'url', label: 'Webhook URL', type: 'url', placeholder: 'https://your-server.com/webhook', required: true, helpText: 'Enter the endpoint URL where you want to receive member events. GroupBase will send POST requests with JSON payloads for each event.' },
+      { key: 'secret', label: 'Signing Secret (optional)', type: 'text', placeholder: 'whsec_...', required: false, helpText: 'If provided, GroupBase will include an HMAC-SHA256 signature in the X-GroupBase-Signature header so you can verify requests are authentic.' },
     ],
   },
   gohighlevel: {
@@ -52,9 +52,9 @@ const INTEGRATION_META = {
     color: 'bg-blue-100 dark:bg-blue-900',
     iconColor: 'text-blue-600 dark:text-blue-400',
     configFields: [
-      { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'Your GHL API key', required: true },
-      { key: 'location_id', label: 'Location ID', type: 'text', placeholder: 'Your GHL location ID', required: true },
-      { key: 'tag', label: 'Default Tag (optional)', type: 'text', placeholder: 'e.g. facebook-lead', required: false },
+      { key: 'api_key', label: 'Access Token', type: 'password', placeholder: 'Your GHL API key', required: true, helpText: 'Go to Settings \u2192 Private Integrations. Click "Create New Integration", name it "GroupBase", and click Next. Add these scopes: contacts.write and locations.readonly. Click Create, then copy the token and paste it here.' },
+      { key: 'location_id', label: 'Location ID', type: 'text', placeholder: 'Your GHL location ID', required: true, helpText: 'Go to Settings \u2192 Business Profile and copy the Location ID and paste it here.' },
+      { key: 'tag', label: 'Default Tag (optional)', type: 'text', placeholder: 'e.g. facebook-lead', required: false, helpText: 'Enter a tag to apply to new contacts automatically. Separate multiple tags with commas.' },
     ],
   },
   mailchimp: {
@@ -64,9 +64,9 @@ const INTEGRATION_META = {
     color: 'bg-yellow-100 dark:bg-yellow-900',
     iconColor: 'text-yellow-600 dark:text-yellow-400',
     configFields: [
-      { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'Your Mailchimp API key (key-dc)', required: true },
-      { key: 'audience_id', label: 'Audience/List ID', type: 'text', placeholder: 'Your Mailchimp audience ID', required: true },
-      { key: 'tag', label: 'Default Tag (optional)', type: 'text', placeholder: 'e.g. facebook-group', required: false },
+      { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'Your Mailchimp API key (key-dc)', required: true, helpText: 'Go to your Mailchimp account \u2192 Profile \u2192 Extras \u2192 API Keys. Click "Create A Key", copy the key (format: xxxxxxxx-usX), and paste it here.' },
+      { key: 'audience_id', label: 'Audience/List ID', type: 'text', placeholder: 'Your Mailchimp audience ID', required: true, helpText: 'Go to Audience \u2192 Settings \u2192 Audience name and defaults. The Audience ID is shown at the top of the page.' },
+      { key: 'tag', label: 'Default Tag (optional)', type: 'text', placeholder: 'e.g. facebook-group', required: false, helpText: 'Enter a tag to apply to new subscribers automatically. Separate multiple tags with commas.' },
     ],
   },
   zapier: {
@@ -76,7 +76,7 @@ const INTEGRATION_META = {
     color: 'bg-orange-100 dark:bg-orange-900',
     iconColor: 'text-orange-600 dark:text-orange-400',
     configFields: [
-      { key: 'url', label: 'Zapier Webhook URL', type: 'url', placeholder: 'https://hooks.zapier.com/hooks/catch/...', required: true },
+      { key: 'url', label: 'Zapier Webhook URL', type: 'url', placeholder: 'https://hooks.zapier.com/hooks/catch/...', required: true, helpText: 'In Zapier, create a new Zap and choose "Webhooks by Zapier" as the trigger. Select "Catch Hook", copy the webhook URL, and paste it here.' },
     ],
   },
 } as const
@@ -414,6 +414,11 @@ export default function IntegrationsPage() {
                         onChange={(e) => setAddConfig({ ...addConfig, [field.key]: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
                       />
+                      {field.helpText && (
+                        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                          {field.helpText}
+                        </p>
+                      )}
                     </div>
                   ))}
 
