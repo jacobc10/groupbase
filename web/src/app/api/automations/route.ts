@@ -18,7 +18,7 @@ export interface Automation {
   updated_at: string
 }
 
-// GET /api/automations — list automations for user's groups
+// GET /api/automations â list automations for user's groups
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ automations })
 }
 
-// POST /api/automations — create a new automation
+// POST /api/automations â create a new automation
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -88,16 +88,6 @@ export async function POST(request: NextRequest) {
 
   const plan = (profile?.plan as 'free' | 'pro' | 'enterprise') || 'free'
   const limits = getLimits(plan)
-
-  if (limits.integrations === 0) {
-    return NextResponse.json(
-      {
-        error: 'Automations are not available on the Free plan. Upgrade to Pro or Enterprise.',
-        code: 'PLAN_LIMIT_REACHED',
-      },
-      { status: 403 }
-    )
-  }
 
   // Count existing automations for this group
   if (limits.integrations !== -1) {
