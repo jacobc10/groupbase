@@ -19,7 +19,7 @@ export const PLANS = {
     limits: {
       groups: 1,
       membersPerGroup: 50,
-      integrations: 0,
+      integrations: 1,
       teamMembers: 2,
       csvExport: false,
       emailsPerDay: 5,
