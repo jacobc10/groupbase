@@ -102,10 +102,6 @@ export async function checkIntegrationLimit(userId: string, groupId: string): Pr
     return { allowed: true, current: 0, limit: -1 }
   }
 
-  if (limits.integrations === 0) {
-    return { allowed: false, current: 0, limit: 0 }
-  }
-
   const { count } = await supabase
     .from('integrations')
     .select('*', { count: 'exact', head: true })
