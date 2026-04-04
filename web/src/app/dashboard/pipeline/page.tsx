@@ -132,7 +132,7 @@ export default function PipelinePage() {
   }
 
   // Search members to add
-  const searchTimeout = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   function handleMemberSearch(query: string) {
     setMemberSearch(query)
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
