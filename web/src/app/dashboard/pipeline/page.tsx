@@ -133,23 +133,36 @@ export default function PipelinePage() {
 
   // Search members to add
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  function getExistingMemberIds(): Set<string> {
+    return new Set(
+      activePipeline?.stages?.flatMap(s =>
+        (s.pipeline_members || []).map(pm => pm.member_id)
+      ) || []
+    )
+  }
+
+  async function loadRecentMembers() {
+    setSearchLoading(true)
+    const res = await fetch('/api/members?sort_by=created_at&limit=10')
+    const data = await res.json()
+    const existingIds = getExistingMemberIds()
+    setSearchResults((data.members || []).filter((m: Member) => !existingIds.has(m.id)))
+    setSearchLoading(false)
+  }
+
   function handleMemberSearch(query: string) {
     setMemberSearch(query)
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
     if (!query.trim()) {
-      setSearchResults([])
+      loadRecentMembers()
       return
     }
     searchTimeout.current = setTimeout(async () => {
       setSearchLoading(true)
       const res = await fetch(`/api/members?search=${encodeURIComponent(query)}&limit=10`)
       const data = await res.json()
-      // Filter out members already in pipeline
-      const existingIds = new Set(
-        activePipeline?.stages?.flatMap(s =>
-          (s.pipeline_members || []).map(pm => pm.member_id)
-        ) || []
-      )
+      const existingIds = getExistingMemberIds()
       setSearchResults((data.members || []).filter((m: Member) => !existingIds.has(m.id)))
       setSearchLoading(false)
     }, 300)
@@ -470,6 +483,7 @@ export default function PipelinePage() {
                   type="text"
                   value={memberSearch}
                   onChange={(e) => handleMemberSearch(e.target.value)}
+                  onFocus={() => { if (!memberSearch.trim()) loadRecentMembers() }}
                   placeholder="Search members by name or email..."
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
@@ -508,8 +522,10 @@ export default function PipelinePage() {
                     </span>
                   </button>
                 ))}
-                {memberSearch && !searchLoading && searchResults.length === 0 && (
-                  <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">No members found</p>
+                {!searchLoading && searchResults.length === 0 && (
+                  <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">
+                    {memberSearch ? 'No members found' : 'No recent members available'}
+                  </p>
                 )}
               </div>
             </div>
