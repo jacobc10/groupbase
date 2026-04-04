@@ -11,6 +11,7 @@ export type ActivityAction =
   | 'integration_synced'
   | 'email_sent'
   | 'member_deleted'
+  | 'pipeline_stage_changed'
 
 export interface Profile {
   id: string
@@ -58,7 +59,7 @@ export interface Member {
   name: string
   email: string | null
   phone: string | null
-  answers: Array<{ question?: string | null; answer: string }> | string[]
+  answers: Record<string, string>[] | string[]
   tags: string[]
   status: MemberStatus
   assigned_to: string | null
@@ -79,6 +80,43 @@ export interface Integration {
   last_synced_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface Pipeline {
+  id: string
+  owner_id: string
+  name: string
+  description: string | null
+  is_default: boolean
+  created_at: string
+  updated_at: string
+  // Joined data
+  stages?: PipelineStage[]
+}
+
+export interface PipelineStage {
+  id: string
+  pipeline_id: string
+  name: string
+  color: string
+  position: number
+  status_mapping: MemberStatus | null
+  created_at: string
+  updated_at: string
+  // Joined data
+  pipeline_members?: PipelineMember[]
+}
+
+export interface PipelineMember {
+  id: string
+  pipeline_id: string
+  stage_id: string
+  member_id: string
+  position: number
+  added_at: string
+  moved_at: string
+  // Joined data
+  member?: Member
 }
 
 export interface ActivityLog {
