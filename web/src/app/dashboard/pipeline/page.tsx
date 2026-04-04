@@ -162,8 +162,7 @@ export default function PipelinePage() {
       setSearchLoading(true)
       const res = await fetch(`/api/members?search=${encodeURIComponent(query)}&limit=10`)
       const data = await res.json()
-      const existingIds = getExistingMemberIds()
-      setSearchResults((data.members || []).filter((m: Member) => !existingIds.has(m.id)))
+      setSearchResults(data.members || [])
       setSearchLoading(false)
     }, 300)
   }
