@@ -21,7 +21,7 @@ interface BulkEmailRecipient {
   html: string
 }
 
-const DEFAULT_FROM = 'GroupBase <notifications@groupbase.app>'
+const DEFAULT_FROM = 'GroupBase <notifications@usegroupbase.com>'
 
 /**
  * Send a single email via Resend API
