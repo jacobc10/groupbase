@@ -95,7 +95,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold mb-3">Rich Integrations</h3>
               <p className="text-gray-600 dark:text-gray-400">
-                Connect with GoHighLevel, Mailchimp, Zapier, and other tools you already use.
+                Connect with GoHighLevel and other tools to automate your workflow.
               </p>
             </div>
 
@@ -141,7 +141,7 @@ export default function Home() {
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center text-sm">
                   <span className="w-4 h-4 bg-green-500 rounded-full mr-3 flex-shrink-0"></span>
-                  Up to 100 members
+                  Up to 50 members
                 </li>
                 <li className="flex items-center text-sm">
                   <span className="w-4 h-4 bg-green-500 rounded-full mr-3 flex-shrink-0"></span>
@@ -208,7 +208,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-center text-sm">
                   <span className="w-4 h-4 bg-green-500 rounded-full mr-3 flex-shrink-0"></span>
-                  All integrations (GoHighLevel, Mailchimp, Zapier)
+                  All integrations (GoHighLevel + more coming soon)
                 </li>
                 <li className="flex items-center text-sm">
                   <span className="w-4 h-4 bg-green-500 rounded-full mr-3 flex-shrink-0"></span>
