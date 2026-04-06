@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Users, Zap, TrendingUp, CheckCircle, ArrowUpRight, Filter, Plus, Loader2 } from 'lucide-react'
+import OnboardingChecklist from '@/components/onboarding/OnboardingChecklist'
 import type { Member, Group } from '@/types/database'
 
 interface DashboardStats {
@@ -122,6 +123,12 @@ export default function DashboardPage() {
           Welcome back! Here&apos;s what&apos;s happening with your groups.
         </p>
       </div>
+
+      {/* Onboarding Checklist */}
+      <OnboardingChecklist
+        groupsCount={stats?.activeGroups || 0}
+        membersCount={stats?.totalMembers || 0}
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -267,10 +274,10 @@ export default function DashboardPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {member.email || '—'}
+                      {member.email || 'â'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {member.group?.name || '—'}
+                      {member.group?.name || 'â'}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[member.status as keyof typeof statusColors] || statusColors.new}`}>
