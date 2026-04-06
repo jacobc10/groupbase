@@ -164,7 +164,7 @@
       // Facebook uses data-visualcompletion on card containers
       if (container.hasAttribute('data-visualcompletion')) {
         bestContainer = container;
-        // Don't break â keep looking for a better semantic container
+        // Don't break — keep looking for a better semantic container
       }
 
       // Look for containers that have both a profile link and approve/decline buttons
@@ -211,7 +211,36 @@
       };
 
       // --- Extract name and profile URL ---
+      // Facebook member request cards contain multiple links: profile, location, mutual friends, etc.
+      // Location links appear BEFORE profile links in DOM order, so we must filter them out.
+      // Location URLs look like: /pages/City-Name/123, /City-State-123/, or contain geographic slugs.
+      // Profile URLs look like: /profile.php?id=123 or /vanity.username
       const links = memberContainer.querySelectorAll('a[href]');
+
+      // Helper: detect if a URL is a location/place link (not a person profile)
+      function isLocationOrPlaceLink(href, fullHref) {
+        const url = fullHref || href;
+        // Facebook place/location pages: /pages/Category/City-Name/id
+        if (/\/pages\//i.test(url)) return true;
+        // Location slugs: /City-State-123456/ (capitalized words joined by hyphens followed by digits)
+        if (/facebook\.com\/[A-Z][a-zA-Z]+-[A-Z][a-zA-Z]+-\d+/i.test(url)) return true;
+        // Location-style paths with multiple hyphens and digits at end
+        if (/facebook\.com\/[A-Za-z]+-[A-Za-z]+-[A-Za-z]+-\d+/.test(url)) return true;
+        // Place IDs (all-digit paths that aren't profile.php)
+        if (/facebook\.com\/\d+\/?$/.test(url) && !url.includes('profile.php')) return true;
+        return false;
+      }
+
+      // Helper: detect if link text looks like a location name
+      function isLocationText(text) {
+        if (!text) return false;
+        // "City, State" or "City, Country" pattern
+        if (/^[A-Z][a-zA-Z\s]+,\s+[A-Z][a-zA-Z\s]+$/.test(text)) return true;
+        // Common location suffixes
+        if (/,\s*(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)$/i.test(text)) return true;
+        return false;
+      }
+
       for (const link of links) {
         const href = link.getAttribute('href') || '';
         const fullHref = link.href || '';
@@ -226,33 +255,55 @@
           continue;
         }
 
+        // Skip location/place links
+        if (isLocationOrPlaceLink(href, fullHref)) {
+          continue;
+        }
+
         // Must be a Facebook profile link
         if (
           fullHref.includes('facebook.com/') ||
           href.startsWith('/')
         ) {
           const text = link.textContent?.trim();
-          // Must have reasonable name text (not just icons or buttons)
-          if (
-            text &&
-            text.length > 1 &&
-            text.length < 80 &&
-            !['Approve', 'Decline', 'Report', 'Delete', 'Block'].includes(text)
-          ) {
-            memberData.name = text;
-            memberData.profileUrl = fullHref.startsWith('http')
-              ? fullHref
-              : `https://www.facebook.com${href}`;
 
-            // Try to extract numeric user ID
-            const idMatch = fullHref.match(
-              /facebook\.com\/(?:profile\.php\?id=)?(\d+)/
-            );
-            if (idMatch) {
-              memberData.fbUserId = idMatch[1];
-            }
-            break;
+          // Skip buttons, actions, and location-like text
+          if (
+            !text ||
+            text.length <= 1 ||
+            text.length >= 80 ||
+            ['Approve', 'Decline', 'Report', 'Delete', 'Block', 'More', 'See more'].includes(text) ||
+            isLocationText(text)
+          ) {
+            continue;
           }
+
+          // Skip links that look like "X mutual friends" or other metadata
+          if (/^\d+\s+(mutual\s+friend|friend|follower)/i.test(text)) {
+            continue;
+          }
+
+          memberData.name = text;
+          memberData.profileUrl = fullHref.startsWith('http')
+            ? fullHref
+            : `https://www.facebook.com${href}`;
+
+          // Try to extract numeric user ID or vanity username
+          const idMatch = fullHref.match(
+            /facebook\.com\/(?:profile\.php\?id=)?(\d+)/
+          );
+          if (idMatch) {
+            memberData.fbUserId = idMatch[1];
+          } else {
+            // Extract vanity username (e.g. facebook.com/tony.roark)
+            const vanityMatch = fullHref.match(
+              /facebook\.com\/([a-zA-Z0-9._-]+)\/?(?:\?|$)/
+            );
+            if (vanityMatch && !['groups', 'pages', 'events', 'photo', 'photos', 'videos', 'watch', 'marketplace', 'gaming', 'search'].includes(vanityMatch[1])) {
+              memberData.fbUserId = vanityMatch[1];
+            }
+          }
+          break;
         }
       }
 
@@ -275,162 +326,102 @@
       }
 
       // --- Extract membership question answers ---
-      // Facebook renders Q&A pairs in the member request card.
-      // We look for question-answer patterns in the DOM structure.
-
-      // Strategy 1: Look for Q&A container sections
-      // Facebook typically renders questions as bold/semibold spans
-      // with answers as subsequent text elements
-      const qaPairs = [];
-
-      // Collect all visible text elements with their DOM context
-      const textElements = [];
+      // Facebook shows Q&A in the member request card.
+      // Strategy: collect text nodes but aggressively filter out non-Q&A content
+      // like accessibility labels, button text, metadata, location info, etc.
+      const allText = [];
       const walker = document.createTreeWalker(
         memberContainer,
         NodeFilter.SHOW_TEXT,
-        null,
-        false
+        {
+          acceptNode: function(node) {
+            // Skip text inside buttons, links we already processed, and aria-hidden elements
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+
+            // Skip text inside interactive elements (buttons, action links)
+            const closestButton = parent.closest('button, [role="button"]');
+            if (closestButton) return NodeFilter.FILTER_REJECT;
+
+            // Skip text inside elements with aria-label (accessibility wrappers)
+            if (parent.getAttribute('aria-label') || parent.closest('[aria-label]')) {
+              // But allow if it's deep inside the Q&A area (span[dir="auto"] often wraps answers)
+              if (!parent.closest('span[dir="auto"]') && !parent.matches('span[dir="auto"]')) {
+                return NodeFilter.FILTER_REJECT;
+              }
+            }
+
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        }
       );
 
       while (walker.nextNode()) {
-        const node = walker.currentNode;
-        const text = node.textContent?.trim();
-        if (!text || text.length < 2) continue;
-
-        // Get the parent element for context
-        const parent = node.parentElement;
-        if (!parent) continue;
-
-        // Skip hidden elements
-        const style = window.getComputedStyle(parent);
-        if (style.display === 'none' || style.visibility === 'hidden') continue;
-
-        // Skip elements that are accessibility-only (screen reader text)
-        if (parent.closest('[aria-hidden="true"]')) continue;
-
-        textElements.push({
-          text,
-          parent,
-          isBold: style.fontWeight >= 600 || parent.tagName === 'STRONG' || parent.tagName === 'B',
-          isSmall: parseFloat(style.fontSize) < 13,
-          role: parent.getAttribute('role') || parent.closest('[role]')?.getAttribute('role') || '',
-          ariaLabel: parent.getAttribute('aria-label') || '',
-        });
-      }
-
-      // Aggressive filter: remove all known garbage patterns
-      const isGarbage = (text) => {
-        // Exact matches to skip
-        const exactSkips = new Set([
-          memberData.name,
-          'Approve', 'Decline', 'Report', 'Delete', 'Block', 'More', 'Edit',
-          'Requested', 'Pending', 'Approved', 'Declined',
-          groupInfo.fbGroupName,
-          'Member requests', 'No pending members',
-          'Questions', 'Gender', 'Request age', 'Join Facebook date',
-          'More filters', 'Clear filters', 'Newest first',
-          'Joined Facebook', 'Lives in', 'From', 'Works at',
-          'Question 1', 'Question 2', 'Question 3',
-        ]);
-        if (exactSkips.has(text)) return true;
-
-        // Pattern matches to skip
-        const garbagePatterns = [
-          /^Accessibility label:/i,
-          /^\d+ (hours?|minutes?|days?|weeks?|months?|years?) ago$/i,
-          /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/,
-          /^\d+ (groups?|friends?|mutual) in common$/i,
-          /^\d+ other groups?$/i,
-          /^\d+ mutual friends?$/i,
-          /^(Joined|Created|Founded)\s/i,
-          /^(\d+\s)?(years?|months?|weeks?|days?)\s*ago$/i,
-          /^(Admin|Moderator|Member|New member|Group expert)$/i,
-          /^(Co-host|Host|Contributor)(\s|$)/i,
-          /^(View profile|See more|Show more|View all)/i,
-          /button/i,
-          /^Reply$/i,
-          /^Like$/i,
-          /^Share$/i,
-          /^Comment$/i,
-          /^Write (a |your )?/i,
-          /^Add a comment/i,
-          /^\d+$/,  // Pure numbers
-          /^[Â·â¢\-ââ]$/,  // Bullets/separators
-        ];
-        return garbagePatterns.some(p => p.test(text));
-      };
-
-      // Filter to only meaningful text
-      const meaningfulTexts = textElements.filter(el => {
-        if (isGarbage(el.text)) return false;
-        if (el.text.length < 3) return false;
-        if (el.role === 'button') return false;
-        if (el.ariaLabel && el.ariaLabel.length > 0) return false;  // Skip aria-labeled elements (buttons)
-        return true;
-      });
-
-      // Strategy 2: Try to identify Q&A pairs by looking for question-like text
-      // Questions typically end with "?" or are bold text followed by answer text
-      const questionPattern = /\?(\s|$)/;
-      let currentQuestion = null;
-      let currentAnswers = [];
-
-      for (let i = 0; i < meaningfulTexts.length; i++) {
-        const el = meaningfulTexts[i];
-        const text = el.text;
-
-        // Is this a question? (ends with ? or is bold text that looks like a question)
-        if (questionPattern.test(text) || (el.isBold && text.length > 15)) {
-          // Save previous Q&A pair if exists
-          if (currentQuestion && currentAnswers.length > 0) {
-            qaPairs.push({
-              question: currentQuestion,
-              answer: currentAnswers.join(' '),
-            });
-          }
-          currentQuestion = text;
-          currentAnswers = [];
-        } else if (currentQuestion) {
-          // This text follows a question â it's likely an answer
-          currentAnswers.push(text);
-        } else {
-          // Text before any question â could still be an answer if it's meaningful
-          // Store as answer-only (no question paired)
-          if (text.length > 3) {
-            qaPairs.push({
-              question: null,
-              answer: text,
-            });
-          }
+        const text = walker.currentNode.textContent?.trim();
+        if (text && text.length > 3 && text.length < 1000) {
+          allText.push(text);
         }
       }
 
-      // Don't forget the last Q&A pair
-      if (currentQuestion && currentAnswers.length > 0) {
-        qaPairs.push({
-          question: currentQuestion,
-          answer: currentAnswers.join(' '),
-        });
-      } else if (currentQuestion) {
-        // Question with no answer
-        qaPairs.push({
-          question: currentQuestion,
-          answer: '(no answer provided)',
-        });
+      // Comprehensive skip list for non-Q&A content
+      const skipTexts = new Set([
+        memberData.name,
+        'Approve',
+        'Decline',
+        'Report',
+        'Delete',
+        'Block',
+        'More',
+        'Edit',
+        'See more',
+        'See less',
+        'Requested',
+        'Invited',
+        groupInfo.fbGroupName,
+        'Member requests',
+        'No pending members',
+        'Approve member',
+        'Decline member',
+        'Approve request',
+        'Decline request',
+      ]);
+
+      const answers = [];
+      for (const text of allText) {
+        // Skip exact matches
+        if (skipTexts.has(text)) continue;
+        // Must be meaningful length
+        if (text.length <= 5) continue;
+        // Skip date/time strings
+        if (/^\d+\s+(hours?|minutes?|days?|weeks?|months?|years?)\s+ago$/i.test(text)) continue;
+        if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i.test(text)) continue;
+        // Skip filter/UI labels
+        if (['Questions', 'Gender', 'Request age', 'Join Facebook date', 'More filters', 'Clear filters', 'Newest first', 'Oldest first', 'Pending', 'Pre-approved'].includes(text)) continue;
+        // Skip accessibility labels and descriptions
+        if (/^Accessibility/i.test(text)) continue;
+        if (/^This\s+(button|link|image|icon|element)\s/i.test(text)) continue;
+        // Skip location-like text (City, State patterns)
+        if (/^[A-Z][a-zA-Z\s]+,\s+[A-Z][a-zA-Z\s]+$/.test(text)) continue;
+        // Skip friend count text
+        if (/^\d+\s+(mutual\s+friend|friend|follower)/i.test(text)) continue;
+        // Skip "Joined Facebook in YYYY" or "Joined in YYYY"
+        if (/^Joined\s+(Facebook\s+)?in\s+\d{4}/i.test(text)) continue;
+        // Skip "Lives in City" or "From City"
+        if (/^(Lives\s+in|From)\s+/i.test(text)) continue;
+        // Skip "Requested X ago" status text
+        if (/^Requested\s+/i.test(text)) continue;
+        // Skip "Invited by" text
+        if (/^Invited\s+by\s+/i.test(text)) continue;
+        // Skip numeric-only text (like counts)
+        if (/^\d+$/.test(text)) continue;
+        // Skip very short generic words that slip through
+        if (/^(Admin|Member|Moderator|Contributor|Group\s+rules?)$/i.test(text)) continue;
+
+        answers.push(text);
       }
 
-      // Store as Q&A pair objects
-      memberData.answers = qaPairs.slice(0, 10);
-
-      // Auto-detect email from answers and store in memberData
-      const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
-      for (const qa of qaPairs) {
-        const emailMatch = qa.answer.match(emailRegex);
-        if (emailMatch) {
-          memberData.email = emailMatch[0].toLowerCase();
-          break;
-        }
-      }
+      // Deduplicate and limit answers
+      memberData.answers = [...new Set(answers)].slice(0, 10);
 
       logger.log('Extracted member data:', memberData);
       return memberData;
@@ -591,7 +582,7 @@
       if (result.success) {
         injectApprovedBadge(container);
         updateCaptureCount();
-        showNotification(`â ${memberData.name} captured by GroupBase`);
+        showNotification(`✓ ${memberData.name} captured by GroupBase`);
         logger.log('Member captured successfully:', memberData.name);
       } else {
         if (result.queued) {
@@ -674,227 +665,6 @@
   }
 
   // ============================================
-  // BATCH APPROVE
-  // ============================================
-
-  let batchApproveRunning = false;
-
-  /**
-   * Find all visible Approve buttons on the page.
-   * Scans for buttons/roles matching our approve detection, excluding
-   * any that have already been clicked (Facebook usually removes them).
-   */
-  function findAllApproveButtons() {
-    const candidates = document.querySelectorAll(
-      '[role="button"], button, [aria-label]'
-    );
-    const approveButtons = [];
-
-    for (const el of candidates) {
-      if (isApproveButton(el)) {
-        // Make sure it's visible and not already processed
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          approveButtons.push(el);
-        }
-      }
-    }
-
-    // Deduplicate â a span inside a button may both match; keep the outermost
-    const unique = [];
-    for (const btn of approveButtons) {
-      const dominated = approveButtons.some(
-        (other) => other !== btn && other.contains(btn)
-      );
-      if (!dominated) unique.push(btn);
-    }
-
-    return unique;
-  }
-
-  /**
-   * Scroll the page to load more member requests.
-   * Returns true if new content was loaded.
-   */
-  async function scrollToLoadMore() {
-    const before = document.querySelectorAll('[role="listitem"], [role="article"], [role="row"]').length;
-    window.scrollTo(0, document.body.scrollHeight);
-    await new Promise((r) => setTimeout(r, 1500));
-    const after = document.querySelectorAll('[role="listitem"], [role="article"], [role="row"]').length;
-    return after > before;
-  }
-
-  /**
-   * Batch-approve all pending members on the page.
-   * Clicks each Approve button sequentially with a delay between clicks
-   * so the existing capture flow can process each member.
-   */
-  async function batchApproveAll() {
-    if (batchApproveRunning) {
-      logger.warn('Batch approve already running');
-      return;
-    }
-
-    // Check auth first
-    const authState = await checkAuthStatus();
-    if (!authState.authenticated) {
-      showNotification('Sign in to GroupBase extension first', 'error');
-      return;
-    }
-
-    batchApproveRunning = true;
-    updateBatchUI('starting');
-
-    let totalApproved = 0;
-    let round = 0;
-    const MAX_ROUNDS = 20; // safety cap to avoid infinite loops
-
-    try {
-      while (round < MAX_ROUNDS) {
-        round++;
-        const buttons = findAllApproveButtons();
-
-        if (buttons.length === 0) {
-          // Try scrolling to load more
-          logger.log('No approve buttons found, scrolling to load more...');
-          const loaded = await scrollToLoadMore();
-          if (!loaded) {
-            logger.log('No more content to load, batch complete');
-            break;
-          }
-          // Re-check after scroll
-          const afterScroll = findAllApproveButtons();
-          if (afterScroll.length === 0) break;
-          // Continue loop to process newly loaded buttons
-          continue;
-        }
-
-        logger.log(`Batch round ${round}: found ${buttons.length} approve buttons`);
-        updateBatchUI('running', totalApproved, totalApproved + buttons.length);
-
-        for (let i = 0; i < buttons.length; i++) {
-          if (!batchApproveRunning) {
-            logger.log('Batch approve cancelled by user');
-            updateBatchUI('cancelled', totalApproved);
-            return;
-          }
-
-          const btn = buttons[i];
-
-          // Scroll button into view
-          btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          await new Promise((r) => setTimeout(r, 300));
-
-          // Find the member container BEFORE clicking (it may disappear after)
-          const container = findMemberContainer(btn);
-          let memberData = null;
-          if (container) {
-            memberData = extractMemberData(container);
-          }
-
-          // Click the approve button
-          btn.click();
-          logger.log(`Clicked approve button ${i + 1}/${buttons.length}`);
-
-          // If we got member data, send it to background
-          if (memberData && memberData.name) {
-            const dedupeKey = `${memberData.name}-${memberData.profileUrl || ''}`;
-            if (!capturedMembers.has(dedupeKey)) {
-              capturedMembers.add(dedupeKey);
-              const result = await sendMemberDataToBackground(memberData);
-              if (result.success) {
-                if (container) injectApprovedBadge(container);
-                updateCaptureCount();
-              }
-            }
-          }
-
-          totalApproved++;
-          updateBatchUI('running', totalApproved);
-
-          // Delay between clicks to let Facebook process
-          await new Promise((r) => setTimeout(r, 800));
-        }
-
-        // Brief pause between rounds, then scroll to load more
-        await new Promise((r) => setTimeout(r, 500));
-        const loaded = await scrollToLoadMore();
-        if (!loaded) break;
-      }
-
-      updateBatchUI('done', totalApproved);
-      showNotification(`â Batch complete â ${totalApproved} member${totalApproved !== 1 ? 's' : ''} approved`);
-      logger.log(`Batch approve complete: ${totalApproved} members approved`);
-    } catch (error) {
-      logger.error('Batch approve error:', error);
-      updateBatchUI('error', totalApproved);
-      showNotification('Batch approve encountered an error', 'error');
-    } finally {
-      batchApproveRunning = false;
-    }
-  }
-
-  /**
-   * Update the batch-approve UI in the banner.
-   * States: starting, running, done, cancelled, error
-   */
-  function updateBatchUI(state, count = 0, total = null) {
-    const statusEl = document.getElementById('groupbase-batch-status');
-    const btn = document.getElementById('groupbase-batch-btn');
-    const cancelBtn = document.getElementById('groupbase-batch-cancel');
-
-    if (state === 'starting') {
-      if (btn) btn.style.display = 'none';
-      if (cancelBtn) cancelBtn.style.display = 'inline-block';
-      if (statusEl) {
-        statusEl.textContent = 'Scanning for membersâ¦';
-        statusEl.style.display = 'block';
-      }
-    } else if (state === 'running') {
-      if (statusEl) {
-        statusEl.textContent = total
-          ? `Approvingâ¦ ${count}/${total}`
-          : `Approved: ${count}`;
-        statusEl.style.display = 'block';
-      }
-    } else if (state === 'done') {
-      if (btn) {
-        btn.style.display = 'inline-block';
-        btn.textContent = 'â Done';
-        btn.disabled = true;
-        btn.classList.add('done');
-      }
-      if (cancelBtn) cancelBtn.style.display = 'none';
-      if (statusEl) {
-        statusEl.textContent = `${count} member${count !== 1 ? 's' : ''} approved`;
-        statusEl.style.display = 'block';
-      }
-      // Re-enable button after 5s for another run
-      setTimeout(() => {
-        if (btn) {
-          btn.textContent = 'Approve All';
-          btn.disabled = false;
-          btn.classList.remove('done');
-        }
-      }, 5000);
-    } else if (state === 'cancelled') {
-      if (btn) btn.style.display = 'inline-block';
-      if (cancelBtn) cancelBtn.style.display = 'none';
-      if (statusEl) {
-        statusEl.textContent = `Cancelled after ${count}`;
-        statusEl.style.display = 'block';
-      }
-    } else if (state === 'error') {
-      if (btn) btn.style.display = 'inline-block';
-      if (cancelBtn) cancelBtn.style.display = 'none';
-      if (statusEl) {
-        statusEl.textContent = `Error after ${count} approved`;
-        statusEl.style.display = 'block';
-      }
-    }
-  }
-
-  // ============================================
   // STATUS BANNER
   // ============================================
 
@@ -916,10 +686,6 @@
     banner.id = 'groupbase-banner';
     banner.className = 'groupbase-banner';
 
-    const isMemberRequestsPage =
-      window.location.pathname.includes('member-requests') ||
-      window.location.pathname.includes('members/pending');
-
     banner.innerHTML = `
       <div class="groupbase-banner-dot ${isAuthenticated ? '' : 'disconnected'}"></div>
       <div class="groupbase-banner-logo">G</div>
@@ -930,37 +696,12 @@
             ? 'Approvals will be captured automatically'
             : 'Click extension icon to sign in'
         }</span>
-        <span id="groupbase-batch-status" class="groupbase-batch-status" style="display:none;"></span>
       </div>
-      ${
-        isAuthenticated && isMemberRequestsPage
-          ? `<button id="groupbase-batch-btn" class="groupbase-batch-btn" title="Approve all pending members">Approve All</button>
-             <button id="groupbase-batch-cancel" class="groupbase-batch-cancel" style="display:none;" title="Stop batch approve">Stop</button>`
-          : ''
-      }
       <span id="groupbase-capture-count" class="groupbase-banner-counter" style="display:none;">0</span>
-      <button class="groupbase-banner-close" title="Minimize">Ã</button>
+      <button class="groupbase-banner-close" title="Minimize">×</button>
     `;
 
     document.body.appendChild(banner);
-
-    // Batch approve button
-    const batchBtn = banner.querySelector('#groupbase-batch-btn');
-    if (batchBtn) {
-      batchBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        batchApproveAll();
-      });
-    }
-
-    // Cancel batch button
-    const cancelBtn = banner.querySelector('#groupbase-batch-cancel');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        batchApproveRunning = false;
-      });
-    }
 
     // Close button minimizes to small dot
     const closeBtn = banner.querySelector('.groupbase-banner-close');
@@ -1057,7 +798,7 @@
       showStatusBanner();
     }
 
-    logger.log('GroupBase content script ready â listening for Approve clicks');
+    logger.log('GroupBase content script ready — listening for Approve clicks');
   }
 
   if (document.readyState === 'loading') {
