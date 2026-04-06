@@ -37,6 +37,19 @@ function formatDetails(details: string | Record<string, unknown> | null | undefi
   if (typeof details === 'object') {
     // Format known fields nicely
     const parts: string[] = []
+    if ('stage_name' in details && details.stage_name) {
+      return `Moved to ${details.stage_name}`
+    }
+    if ('from' in details && 'to' in details) {
+      return `${details.from} \u2192 ${details.to}`
+    }
+    if ('tags' in details && Array.isArray(details.tags)) {
+      return (details.tags as string[]).join(', ')
+    }
+    if ('note' in details && details.note) {
+      return String(details.note)
+    }
+    if ('name' in details && details.name) parts.push(`${details.name}`)
     if ('fb_name' in details && details.fb_name) parts.push(`${details.fb_name}`)
     if ('source' in details && details.source) parts.push(`via ${String(details.source).replace(/_/g, ' ')}`)
     if (parts.length > 0) return parts.join(' — ')
