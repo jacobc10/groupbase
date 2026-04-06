@@ -240,6 +240,9 @@ export default function Home() {
       <footer className="border-t border-gray-200 dark:border-gray-800 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center text-gray-600 dark:text-gray-400">
           <p>&copy; 2026 GroupBase. All rights reserved.</p>
+          <div className="mt-2 space-x-4 text-sm">
+            <Link href="/privacy" className="hover:text-gray-900 dark:hover:text-gray-200">Privacy Policy</Link>
+          </div>
         </div>
       </footer>
     </div>
