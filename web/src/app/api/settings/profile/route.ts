@@ -32,6 +32,14 @@ export async function PUT(request: Request) {
       )
     }
 
+    // Also update team name if full_name changed
+    if (full_name) {
+      await supabase
+        .from('teams')
+        .update({ name: `${full_name}'s Team` })
+        .eq('owner_id', user.id)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Profile update error:', error)
