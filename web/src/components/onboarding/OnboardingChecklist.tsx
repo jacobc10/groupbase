@@ -37,7 +37,7 @@ export default function OnboardingChecklist({ groupsCount, membersCount }: Onboa
   // Step 2: Connect a Facebook Group
   const step2Complete = groupsCount > 0
 
-  // Step 3: Install Download Extension (manual check via localStorage)
+  // Step 3: Install Chrome Extension (manual check via localStorage)
   const step3Complete = extensionInstalled
 
   // Step 4: Approve a member (auto-complete when members exist)
@@ -67,7 +67,7 @@ export default function OnboardingChecklist({ groupsCount, membersCount }: Onboa
     },
     {
       id: 3,
-      title: 'Install the Download Extension',
+      title: 'Install the Chrome Extension',
       description: 'Install our extension to auto-capture member data from Facebook',
       complete: step3Complete,
       icon: Download,
