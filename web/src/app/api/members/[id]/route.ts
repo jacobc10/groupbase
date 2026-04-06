@@ -64,7 +64,7 @@ export async function PATCH(
   }
 
   // Build update object from allowed fields
-  const allowedFields = ['name', 'email', 'phone', 'status', 'tags', 'notes', 'assigned_to']
+  const allowedFields = ['name', 'email', 'phone', 'status', 'tags', 'notes', 'assigned_to', 'answers', 'fb_profile_url', 'fb_user_id']
   const updates: Record<string, unknown> = {}
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
