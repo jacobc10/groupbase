@@ -45,6 +45,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     exported: 'Exported',
     email_sent: 'Email sent',
     member_deleted: 'Member deleted',
+    pipeline_stage_changed: 'Pipeline stage changed',
   }
 
   useEffect(() => {
@@ -357,6 +358,12 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                         <p className="text-gray-500 text-xs">
                           {activity.action === 'status_changed'
                             ? `${(activity.details as Record<string, string>).from} â ${(activity.details as Record<string, string>).to}`
+                            : activity.action === 'pipeline_stage_changed'
+                            ? `Moved to ${(activity.details as Record<string, string>).stage_name || 'new stage'}`
+                            : activity.action === 'tag_added' || activity.action === 'tag_removed'
+                            ? ((activity.details as Record<string, string[]>).tags || []).join(', ')
+                            : activity.action === 'note_added'
+                            ? (activity.details as Record<string, string>).note || ''
                             : JSON.stringify(activity.details)}
                         </p>
                       )}
