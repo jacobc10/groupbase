@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Check, Circle, ExternalLink, Chrome, Users, Globe, X } from 'lucide-react'
+import { Check, Circle, ExternalLink, Download, Users, Globe, X } from 'lucide-react'
 
 interface OnboardingChecklistProps {
   groupsCount: number
@@ -37,7 +37,7 @@ export default function OnboardingChecklist({ groupsCount, membersCount }: Onboa
   // Step 2: Connect a Facebook Group
   const step2Complete = groupsCount > 0
 
-  // Step 3: Install Chrome Extension (manual check via localStorage)
+  // Step 3: Install Download Extension (manual check via localStorage)
   const step3Complete = extensionInstalled
 
   // Step 4: Approve a member (auto-complete when members exist)
@@ -67,10 +67,10 @@ export default function OnboardingChecklist({ groupsCount, membersCount }: Onboa
     },
     {
       id: 3,
-      title: 'Install the Chrome Extension',
+      title: 'Install the Download Extension',
       description: 'Install our extension to auto-capture member data from Facebook',
       complete: step3Complete,
-      icon: Chrome,
+      icon: Download,
       action: {
         label: 'Install Extension',
         href: 'https://chrome.google.com/webstore/detail/groupbase/bjgajmmmfemeieaoikfjkmnglkhgnohj',
