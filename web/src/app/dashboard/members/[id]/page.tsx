@@ -48,6 +48,19 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     pipeline_stage_changed: 'Pipeline stage changed',
   }
 
+  const actionIcons: Record<string, { color: string; bg: string }> = {
+    member_approved: { color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
+    status_changed: { color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    tag_added: { color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
+    tag_removed: { color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+    note_added: { color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
+    assigned: { color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30' },
+    exported: { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
+    email_sent: { color: 'text-cyan-500', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
+    member_deleted: { color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' },
+    pipeline_stage_changed: { color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  }
+
   useEffect(() => {
     async function loadMember() {
       try {
@@ -338,41 +351,49 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* Activity Log */}
+          {/* Activity Timeline */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
             <h2 className="text-lg font-bold flex items-center gap-2">
-              <Clock className="w-5 h-5" /> Activity
+              <Clock className="w-5 h-5" /> Activity Timeline
             </h2>
             {activities.length === 0 ? (
               <p className="text-sm text-gray-500">No activity recorded yet.</p>
             ) : (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {activities.map((activity) => (
-                  <div key={activity.id} className="flex gap-3 text-sm">
-                    <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 flex-shrink-0"></div>
-                    <div>
-                      <p className="font-medium">
-                        {actionLabels[activity.action] || activity.action}
-                      </p>
-                      {activity.details && Object.keys(activity.details).length > 0 && (
-                        <p className="text-gray-500 text-xs">
-                          {activity.action === 'status_changed'
-                            ? `${(activity.details as Record<string, string>).from} â ${(activity.details as Record<string, string>).to}`
-                            : activity.action === 'pipeline_stage_changed'
-                            ? `Moved to ${(activity.details as Record<string, string>).stage_name || 'new stage'}`
-                            : activity.action === 'tag_added' || activity.action === 'tag_removed'
-                            ? ((activity.details as Record<string, string[]>).tags || []).join(', ')
-                            : activity.action === 'note_added'
-                            ? (activity.details as Record<string, string>).note || ''
-                            : JSON.stringify(activity.details)}
-                        </p>
-                      )}
-                      <p className="text-gray-400 text-xs">
-                        {new Date(activity.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="relative max-h-96 overflow-y-auto pr-2">
+                <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                <div className="space-y-4">
+                  {activities.map((activity, idx) => {
+                    const style = actionIcons[activity.action] || { color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700' }
+                    return (
+                      <div key={activity.id} className="relative flex gap-3 text-sm">
+                        <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${style.bg}`}>
+                          <div className={`w-2 h-2 rounded-full ${style.color.replace('text-', 'bg-')}`}></div>
+                        </div>
+                        <div className="flex-1 pb-1">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {actionLabels[activity.action] || activity.action}
+                          </p>
+                          {activity.details && Object.keys(activity.details).length > 0 && (
+                            <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
+                              {activity.action === 'status_changed'
+                                ? `${(activity.details as Record<string, string>).from} → ${(activity.details as Record<string, string>).to}`
+                                : activity.action === 'pipeline_stage_changed'
+                                ? `Moved to ${(activity.details as Record<string, string>).stage_name || 'new stage'}`
+                                : activity.action === 'tag_added' || activity.action === 'tag_removed'
+                                ? ((activity.details as Record<string, string[]>).tags || []).join(', ')
+                                : activity.action === 'note_added'
+                                ? (activity.details as Record<string, string>).note || ''
+                                : JSON.stringify(activity.details)}
+                            </p>
+                          )}
+                          <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+                            {new Date(activity.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
