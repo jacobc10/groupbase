@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Users, CheckCircle, ExternalLink, Loader2, Pencil, Trash2, X, Crown } from 'lucide-react'
+import { Plus, Users, CheckCircle, ExternalLink, Loader2, Pencil, Trash2, X, Crown, Upload } from 'lucide-react'
 import type { Group } from '@/types/database'
 
 export default function GroupsPage() {
@@ -17,6 +17,12 @@ export default function GroupsPage() {
   const [editUrl, setEditUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [groupLimit, setGroupLimit] = useState<{ current: number; limit: number } | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importGroupId, setImportGroupId] = useState<string | null>(null)
+  const [importGroupName, setImportGroupName] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ count: number } | null>(null)
+  const [importError, setImportError] = useState('')
 
   useEffect(() => {
     fetchGroups()
@@ -128,63 +134,15 @@ export default function GroupsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    )
+  const openImportModal = (group: Group) => {
+    setImportGroupId(group.id)
+    setImportGroupName(group.name)
+    setShowImportModal(true)
+    setImportResult(null)
+    setImportError('')
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Groups</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your connected Facebook groups
-            {groupLimit && groupLimit.limit !== -1 && (
-              <span className="ml-2 text-sm">
-                ({groups.length}/{groupLimit.limit} used)
-              </span>
-            )}
-          </p>
-        </div>
-        {atLimit ? (
-          <a
-            href="/dashboard/settings?tab=subscription"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white rounded-lg transition"
-          >
-            <Crown className="w-4 h-4" />
-            Upgrade to Add More
-          </a>
-        ) : (
-          <button
-            onClick={() => { setShowAddModal(true); setAddError('') }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-          >
-            <Plus className="w-4 h-4" />
-            Add Group
-          </button>
-        )}
-      </div>
-
-      {/* Connection Instructions */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
-        <h3 className="font-semibold mb-3">How to connect a Facebook group</h3>
-        <ol className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 font-bold text-blue-600 dark:text-blue-400">1</span>
-            <span>Add your group here using the &quot;Add Group&quot; button</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 font-bold text-blue-600 dark:text-blue-400">2</span>
-            <span>Install the GroupBase Chrome extension and sign in</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 font-bold text-blue-600 dark:text-blue-400">3</span>
-            <span>Go to your Facebook group&apos;s member requests page</span>
+  const handleImportCSV = </span>
           </li>
           <li className="flex gap-3">
             <span className="flex-shrink-0 font-bold text-blue-600 dark:text-blue-400">4</span>
@@ -279,6 +237,13 @@ export default function GroupsPage() {
                           </a>
                         )}
                         <button
+                          onClick={() => openImportModal(group)}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                          title="Import CSV"
+                        >
+                          <Upload className="w-4 h-4 text-gray-400 hover:text-green-500" />
+                        </button>
+                        <button
                           onClick={() => handleDeleteGroup(group.id)}
                           className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition"
                           title="Delete group"
@@ -369,6 +334,64 @@ export default function GroupsPage() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import CSV Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">Import Members to {importGroupName}</h3>
+              <button onClick={() => setShowImportModal(false)}>
+                <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Upload a CSV file with member data. Supported columns: Name, Email, Phone, Tags, Notes, Facebook Profile.
+            </p>
+            {importError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                {importError}
+              </div>
+            )}
+            {importResult && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 text-sm text-green-700 dark:text-green-300">
+                Successfully imported {importResult.count} members!
+              </div>
+            )}
+            <label className="block">
+              <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 transition">
+                {importing ? (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Importing...
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Click to upload CSV</p>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleImportCSV(file)
+                }}
+                disabled={importing}
+              />
+            </label>
+            <button
+              onClick={() => setShowImportModal(false)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
