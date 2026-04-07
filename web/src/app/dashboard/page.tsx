@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Users, Zap, TrendingUp, CheckCircle, ArrowUpRight, Filter, Plus, Loader2 } from 'lucide-react'
+import { Users, Zap, TrendingUp, CheckCircle, ArrowUpRight, Filter, Plus, Loader2, ListChecks, Circle, MessageCircle, BarChart3, Kanban, Mail } from 'lucide-react'
 import OnboardingChecklist from '@/components/onboarding/OnboardingChecklist'
 import type { Member, Group } from '@/types/database'
 
@@ -18,6 +18,33 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [recentMembers, setRecentMembers] = useState<(Member & { group?: { name: string } })[]>([])
   const [loading, setLoading] = useState(true)
+  const [completedActions, setCompletedActions] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const today = new Date().toDateString()
+      const saved = localStorage.getItem('gb_daily_actions')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.date === today) return parsed.completed
+      }
+    }
+    return []
+  })
+
+  const toggleAction = (id: string) => {
+    setCompletedActions(prev => {
+      const next = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+      localStorage.setItem('gb_daily_actions', JSON.stringify({ date: new Date().toDateString(), completed: next }))
+      return next
+    })
+  }
+
+  const dailyActions = [
+    { id: 'review_new', label: 'Review new members', href: '/dashboard/members?status=new', icon: Users },
+    { id: 'check_pipeline', label: 'Check your pipeline', href: '/dashboard/pipeline', icon: Kanban },
+    { id: 'send_messages', label: 'Message leads on Facebook', href: '/dashboard/members?status=contacted', icon: MessageCircle },
+    { id: 'check_analytics', label: 'Review group analytics', href: '/dashboard/analytics', icon: BarChart3 },
+    { id: 'send_emails', label: 'Send follow-up emails', href: '/dashboard/email', icon: Mail },
+  ]
 
   useEffect(() => {
     async function loadDashboard() {
@@ -130,7 +157,62 @@ export default function DashboardPage() {
         membersCount={stats?.totalMembers || 0}
       />
 
-      {/* Stats Grid */}
+      {/* Daily Actions */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <ListChecks className="w-5 h-5 text-blue-600" />
+            Daily Actions
+          </h2>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {completedActions.length}/{dailyActions.length} done today
+          </span>
+        </div>
+        <div className="space-y-2">
+          {dailyActions.map((action) => {
+            const done = completedActions.includes(action.id)
+            const Icon = action.icon
+            return (
+              <div
+                key={action.id}
+                className={`flex items-center gap-3 p-3 rounded-lg transition cursor-pointer ${
+                  done
+                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                    : 'bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                onClick={() => toggleAction(action.id)}
+              >
+                <button className="flex-shrink-0">
+                  {done ? (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600" />
+                  )}
+                </button>
+                <Icon className={`w-4 h-4 flex-shrink-0 ${done ? 'text-green-500' : 'text-gray-400'}`} />
+                <Link
+                  href={action.href}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`flex-1 text-sm font-medium ${
+                    done ? 'text-green-700 dark:text-green-300 line-through' : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                  }`}
+                >
+                  {action.label}
+                </Link>
+              </div>
+            )
+          })}
+        </div>
+        {completedActions.length === dailyActions.length && (
+          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+            <p className="text-sm font-medium text-green-700 dark:text-green-300">
+              All done for today! Great work.
+            </p>
+          </div>
+        )}
+      </div>
+
+            {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat, index) => {
           const Icon = stat.icon
