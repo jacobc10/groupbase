@@ -11,6 +11,27 @@ import type { Member, Group, MemberStatus } from '@/types/database'
 
 type MemberWithGroup = Member & { group?: { id: string; name: string } }
 
+// Helper: detect if a fb_profile_url is actually a location/city page
+function isLocationUrl(url: string | null): boolean {
+  if (!url) return true
+  // City-State-digits pattern (e.g. /Arvada-Colorado-104093189626951/)
+  if (/facebook\.com\/[A-Z][a-zA-Z]+-[A-Z][a-zA-Z]+-\d+/i.test(url)) return true
+  // /pages/ links
+  if (/\/pages\//i.test(url)) return true
+  // Three-word location slugs with digits
+  if (/facebook\.com\/[A-Za-z]+-[A-Za-z]+-[A-Za-z]+-\d+/.test(url)) return true
+  return false
+}
+
+function getMessagingHref(member: MemberWithGroup): string {
+  if (member.fb_user_id) return `https://www.facebook.com/messages/t/${member.fb_user_id}`
+  if (member.fb_profile_url && !isLocationUrl(member.fb_profile_url)) {
+    const username = member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')
+    return `https://www.facebook.com/messages/t/${username}`
+  }
+  return `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
+}
+
 export default function MembersPage() {
   const [members, setMembers] = useState<MemberWithGroup[]>([])
   const [groups, setGroups] = useState<Group[]>([])
@@ -575,17 +596,11 @@ export default function MembersPage() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-1">
                         <a
-                          href={
-                            member.fb_user_id
-                              ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
-                              : member.fb_profile_url
-                                ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')}`
-                                : `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
-                          }
+                          href={getMessagingHref(member)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
-                          title={member.fb_user_id ? 'Send Facebook Message' : member.fb_profile_url ? 'Send Facebook Message' : 'Message on Facebook'}
+                          title="Send Facebook Message"
                         >
                           <MessageCircle className="w-4 h-4 text-blue-600" />
                         </a>
@@ -744,22 +759,15 @@ export default function MembersPage() {
                     Facebook Profile
                   </a>
                 )}
-                {(member.fb_user_id || member.fb_profile_url) && (
-                  <a
-                    href={
-                      member.fb_user_id
-                        ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
-                        : `${(member.fb_profile_url || '').replace(/\/$/, '')}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => { setActionMenuId(null); setMenuPos(null) }}
-                  >
-                    Send Message
-                  </a>
-                )}
-                <button
+                                    <a
+                      href={getMessagingHref(member)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => { setActionMenuId(null); setMenuPos(null) }}
+                    >
+                      Send Message
+                    </a>                <button
                   onClick={() => handleDeleteMember(member.id)}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
