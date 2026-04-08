@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { dispatchIntegrationEvent } from '@/lib/integrations/dispatcher'
 
-// GET /api/members/[id] — get single member with activity log
+// GET /api/members/[id] â get single member with activity log
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,10 +34,50 @@ export async function GET(
     .order('created_at', { ascending: false })
     .limit(50)
 
-  return NextResponse.json({ member, activities: activities || [] })
+  // Get pipeline stage info for this member
+  const { data: pipelineMember } = await supabase
+    .from('pipeline_members')
+    .select('id, stage_id, pipeline_id, stage:pipeline_stages(id, name, color, status_mapping), pipeline:pipelines(id, name)')
+    .eq('member_id', id)
+    .limit(1)
+    .maybeSingle()
+
+  let pipelineStage = null
+  let pipelineStages: { id: string; name: string; color: string; status_mapping: string; position: number }[] = []
+
+  if (pipelineMember) {
+    const stage = pipelineMember.stage as unknown as { id: string; name: string; color: string; status_mapping: string } | null
+    const pipeline = pipelineMember.pipeline as unknown as { id: string; name: string } | null
+    if (stage && pipeline) {
+      pipelineStage = {
+        stage_id: stage.id,
+        stage_name: stage.name,
+        stage_color: stage.color,
+        pipeline_id: pipeline.id,
+        pipeline_name: pipeline.name,
+        pipeline_member_id: pipelineMember.id,
+      }
+
+      // Also fetch all stages for this pipeline (for the dropdown)
+      const { data: stages } = await supabase
+        .from('pipeline_stages')
+        .select('id, name, color, status_mapping, position')
+        .eq('pipeline_id', pipeline.id)
+        .order('position', { ascending: true })
+
+      pipelineStages = stages || []
+    }
+  }
+
+  return NextResponse.json({
+    member,
+    activities: activities || [],
+    pipelineStage,
+    pipelineStages,
+  })
 }
 
-// PATCH /api/members/[id] — update a member
+// PATCH /api/members/[id] â update a member
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,7 +104,7 @@ export async function PATCH(
   }
 
   // Build update object from allowed fields
-  const allowedFields = ['name', 'email', 'phone', 'status', 'tags', 'notes', 'assigned_to', 'answers', 'fb_profile_url', 'fb_user_id']
+  const allowedFields = ['name', 'email', 'phone', 'status', 'tags', 'notes', 'assigned_to']
   const updates: Record<string, unknown> = {}
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
@@ -127,6 +167,49 @@ export async function PATCH(
     }
   }
 
+  // Handle pipeline stage change if pipeline_stage_id is provided
+  if (body.pipeline_stage_id) {
+    // Find the member's pipeline_members entry
+    const { data: pmEntry } = await supabase
+      .from('pipeline_members')
+      .select('id, pipeline_id')
+      .eq('member_id', id)
+      .limit(1)
+      .maybeSingle()
+
+    if (pmEntry) {
+      // Update the stage â DB trigger will sync the member status
+      await supabase
+        .from('pipeline_members')
+        .update({
+          stage_id: body.pipeline_stage_id,
+          moved_at: new Date().toISOString(),
+          position: 0,
+        })
+        .eq('id', pmEntry.id)
+
+      // Log pipeline stage change
+      await supabase.from('activity_log').insert({
+        member_id: id,
+        group_id: existing.group_id,
+        action: 'pipeline_stage_changed',
+        details: { pipeline_id: pmEntry.pipeline_id, to_stage_id: body.pipeline_stage_id },
+        performed_by: user.id,
+      })
+
+      // Re-fetch member to get the synced status
+      const { data: refreshedMember } = await supabase
+        .from('members')
+        .select('*, group:groups!inner(id, name, fb_group_url)')
+        .eq('id', id)
+        .single()
+
+      if (refreshedMember) {
+        return NextResponse.json({ member: refreshedMember })
+      }
+    }
+  }
+
   // Fire integration events (non-blocking)
   const integrationEvent = body.status && body.status !== existing.status
     ? 'member.status_changed' as const
@@ -146,7 +229,7 @@ export async function PATCH(
   return NextResponse.json({ member })
 }
 
-// DELETE /api/members/[id] — delete a member
+// DELETE /api/members/[id] â delete a member
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
