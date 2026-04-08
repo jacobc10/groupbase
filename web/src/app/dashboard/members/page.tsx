@@ -1,36 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Search, Filter, MoreVertical, Plus, Download, Upload, ChevronLeft, ChevronRight,
-  Loader2, Tag, Trash2, CheckSquare, Square, X, MessageCircle
+  Loader2, Tag, Trash2, CheckSquare, Square, X
 } from 'lucide-react'
 import type { Member, Group, MemberStatus } from '@/types/database'
 
-type MemberWithGroup = Member & { group?: { id: string; name: string } }
-
-// Helper: detect if a fb_profile_url is actually a location/city page
-function isLocationUrl(url: string | null): boolean {
-  if (!url) return true
-  // City-State-digits pattern (e.g. /Arvada-Colorado-104093189626951/)
-  if (/facebook\.com\/[A-Z][a-zA-Z]+-[A-Z][a-zA-Z]+-\d+/i.test(url)) return true
-  // /pages/ links
-  if (/\/pages\//i.test(url)) return true
-  // Three-word location slugs with digits
-  if (/facebook\.com\/[A-Za-z]+-[A-Za-z]+-[A-Za-z]+-\d+/.test(url)) return true
-  return false
+type PipelineStageInfo = {
+  stage_name: string
+  stage_color: string
+  pipeline_name: string
+  stage_id: string
+  pipeline_id: string
 }
 
-function getMessagingHref(member: MemberWithGroup): string {
-  if (member.fb_user_id) return `https://www.facebook.com/messages/t/${member.fb_user_id}`
-  if (member.fb_profile_url && !isLocationUrl(member.fb_profile_url)) {
-    const username = member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')
-    return `https://www.facebook.com/messages/t/${username}`
-  }
-  return `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
-}
+type MemberWithGroup = Member & { group?: { id: string; name: string }; pipeline_stage?: PipelineStageInfo | null }
 
 export default function MembersPage() {
   const [members, setMembers] = useState<MemberWithGroup[]>([])
@@ -49,35 +35,12 @@ export default function MembersPage() {
   const [bulkTagInput, setBulkTagInput] = useState('')
   const [showBulkTag, setShowBulkTag] = useState(false)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [tagFilter, setTagFilter] = useState('')
   const [allTags, setAllTags] = useState<string[]>([])
   const [inlineTagMemberId, setInlineTagMemberId] = useState<string | null>(null)
   const [inlineTagInput, setInlineTagInput] = useState('')
-  const menuRef = useRef<HTMLDivElement>(null)
   const limit = 25
-
-  // Close action menu when clicking outside or scrolling
-  useEffect(() => {
-    if (!actionMenuId) return
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setActionMenuId(null)
-        setMenuPos(null)
-      }
-    }
-    function handleScroll() {
-      setActionMenuId(null)
-      setMenuPos(null)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    window.addEventListener('scroll', handleScroll, true)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      window.removeEventListener('scroll', handleScroll, true)
-    }
-  }, [actionMenuId])
 
   const statusColors = {
     new: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
@@ -436,7 +399,7 @@ export default function MembersPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
             <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -454,7 +417,7 @@ export default function MembersPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-visible">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
@@ -471,13 +434,13 @@ export default function MembersPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-white"
                     onClick={() => handleSort('name')}
                   >
-                    Name {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
+                    Name {sortBy === 'name' && (sortDir === 'asc' ? 'â' : 'â')}
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-white"
                     onClick={() => handleSort('email')}
                   >
-                    Email {sortBy === 'email' && (sortDir === 'asc' ? '↑' : '↓')}
+                    Email {sortBy === 'email' && (sortDir === 'asc' ? 'â' : 'â')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
                     Group
@@ -486,7 +449,10 @@ export default function MembersPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-white"
                     onClick={() => handleSort('status')}
                   >
-                    Status {sortBy === 'status' && (sortDir === 'asc' ? '↑' : '↓')}
+                    Status {sortBy === 'status' && (sortDir === 'asc' ? 'â' : 'â')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
+                    Pipeline Stage
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
                     Tags
@@ -495,7 +461,7 @@ export default function MembersPage() {
                     className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-white"
                     onClick={() => handleSort('created_at')}
                   >
-                    Joined {sortBy === 'created_at' && (sortDir === 'asc' ? '↑' : '↓')}
+                    Joined {sortBy === 'created_at' && (sortDir === 'asc' ? 'â' : 'â')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
                     Actions
@@ -525,15 +491,30 @@ export default function MembersPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {member.email || '—'}
+                      {member.email || 'â'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {member.group?.name || '—'}
+                      {member.group?.name || 'â'}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[member.status as keyof typeof statusColors] || statusColors.new}`}>
                         {member.status.charAt(0).toUpperCase() + member.status.slice(1)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {member.pipeline_stage ? (
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: member.pipeline_stage.stage_color }}
+                          />
+                          <span className="text-gray-900 dark:text-white text-xs font-medium">
+                            {member.pipeline_stage.stage_name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">â</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex flex-wrap gap-1 items-center">
@@ -593,34 +574,39 @@ export default function MembersPage() {
                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                       {new Date(member.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="flex items-center gap-1">
-                        <a
-                          href={getMessagingHref(member)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition"
-                          title="Send Facebook Message"
-                        >
-                          <MessageCircle className="w-4 h-4 text-blue-600" />
-                        </a>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (actionMenuId === member.id) {
-                              setActionMenuId(null)
-                              setMenuPos(null)
-                            } else {
-                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                              setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 })
-                              setActionMenuId(member.id)
-                            }
-                          }}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition"
-                        >
-                          <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                        </button>
-                      </div>
+                    <td className="px-6 py-4 text-sm relative">
+                      <button
+                        onClick={() => setActionMenuId(actionMenuId === member.id ? null : member.id)}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition"
+                      >
+                        <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      </button>
+                      {actionMenuId === member.id && (
+                        <div className="absolute right-0 top-full z-10 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+                          <Link
+                            href={`/dashboard/members/${member.id}`}
+                            className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            View Details
+                          </Link>
+                          {member.fb_profile_url && (
+                            <a
+                              href={member.fb_profile_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Facebook Profile
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleDeleteMember(member.id)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -727,57 +713,6 @@ export default function MembersPage() {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Action Menu Portal - rendered outside overflow containers */}
-      {actionMenuId && menuPos && typeof document !== 'undefined' && createPortal(
-        <div
-          ref={menuRef}
-          className="fixed w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1"
-          style={{ top: menuPos.top, left: Math.max(0, menuPos.left), zIndex: 9999 }}
-        >
-          <Link
-            href={`/dashboard/members/${actionMenuId}`}
-            className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
-            onClick={() => { setActionMenuId(null); setMenuPos(null) }}
-          >
-            View Details
-          </Link>
-          {(() => {
-            const member = members.find(m => m.id === actionMenuId)
-            if (!member) return null
-            return (
-              <>
-                {member.fb_profile_url && (
-                  <a
-                    href={member.fb_profile_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => { setActionMenuId(null); setMenuPos(null) }}
-                  >
-                    Facebook Profile
-                  </a>
-                )}
-                                    <a
-                      href={getMessagingHref(member)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block px-4 py-2 text-sm text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      onClick={() => { setActionMenuId(null); setMenuPos(null) }}
-                    >
-                      Send Message
-                    </a>                <button
-                  onClick={() => handleDeleteMember(member.id)}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  Delete
-                </button>
-              </>
-            )
-          })()}
-        </div>,
-        document.body
       )}
     </div>
   )
