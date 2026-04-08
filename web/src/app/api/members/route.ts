@@ -4,7 +4,7 @@ import { checkMemberLimit } from '@/lib/plan-limits'
 import { dispatchIntegrationEvent } from '@/lib/integrations/dispatcher'
 import { executeAutomations } from '@/lib/automations/engine'
 
-// GET /api/members — list members with search, filter, sort, pagination
+// GET /api/members â list members with search, filter, sort, pagination
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '25')
   const offset = (page - 1) * limit
 
-  // Build query — select members from user's groups, join group name
+  // Build query â select members from user's groups, join group name
   let query = supabase
     .from('members')
     .select('*, group:groups!inner(id, name, fb_group_url)', { count: 'exact' })
@@ -64,16 +64,48 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Fetch pipeline stage info for these members
+  const memberIds = (members || []).map((m: Record<string, unknown>) => m.id as string)
+  let pipelineMap: Record<string, { stage_name: string; stage_color: string; pipeline_name: string; stage_id: string; pipeline_id: string }> = {}
+
+  if (memberIds.length > 0) {
+    const { data: pipelineData } = await supabase
+      .from('pipeline_members')
+      .select('member_id, stage_id, pipeline_id, stage:pipeline_stages(id, name, color, status_mapping), pipeline:pipelines(id, name)')
+      .in('member_id', memberIds)
+
+    if (pipelineData) {
+      for (const pm of pipelineData) {
+        const stage = pm.stage as unknown as { id: string; name: string; color: string; status_mapping: string } | null
+        const pipeline = pm.pipeline as unknown as { id: string; name: string } | null
+        if (stage && pipeline) {
+          pipelineMap[pm.member_id] = {
+            stage_name: stage.name,
+            stage_color: stage.color,
+            pipeline_name: pipeline.name,
+            stage_id: stage.id,
+            pipeline_id: pipeline.id,
+          }
+        }
+      }
+    }
+  }
+
+  // Merge pipeline info into members
+  const membersWithPipeline = (members || []).map((m: Record<string, unknown>) => ({
+    ...m,
+    pipeline_stage: pipelineMap[m.id as string] || null,
+  }))
+
   return NextResponse.json({
-    members: members || [],
+    members: membersWithPipeline,
     total: count || 0,
     page,
     limit,
     totalPages: Math.ceil((count || 0) / limit),
   })
 }
-
-// POST /api/members — create a new member
+// POST /api/members â create a new member
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
