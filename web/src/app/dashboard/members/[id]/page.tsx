@@ -4,8 +4,8 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageSquare,
-  Loader2, Save, Trash2, X, Plus
+  ArrowLeft, ExternalLink, Mail, MessageCircle, Phone, Tag, Clock, User, MessageSquare,
+  Loader2, Save, Trash2, X, Plus, UserCheck, ArrowRightLeft, UserPlus, Send, Archive
 } from 'lucide-react'
 import type { Member, ActivityLog, MemberStatus } from '@/types/database'
 
@@ -257,17 +257,36 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               </div>
             </div>
 
-            {member.fb_profile_url && (
+            <div className="flex flex-wrap gap-3">
+              {member.fb_profile_url && (
+                <a
+                  href={member.fb_profile_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Facebook Profile
+                </a>
+              )}
+
+              {/* Facebook Message Button */}
               <a
-                href={member.fb_profile_url}
+                href={
+                  member.fb_user_id
+                    ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
+                    : member.fb_profile_url
+                      ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/\/$/, '').split('/').pop()}`
+                      : 'https://www.facebook.com/messages/'
+                }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
               >
-                <ExternalLink className="w-4 h-4" />
-                View Facebook Profile
+                <MessageCircle className="w-4 h-4" />
+                {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Send Message' : 'Message on Facebook'}
               </a>
-            )}
+            </div>
           </div>
 
           {/* Membership Answers */}
@@ -424,27 +443,47 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             {activities.length === 0 ? (
               <p className="text-sm text-gray-500">No activity recorded yet.</p>
             ) : (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {activities.map((activity) => (
-                  <div key={activity.id} className="flex gap-3 text-sm">
-                    <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 flex-shrink-0"></div>
-                    <div>
-                      <p className="font-medium">
-                        {actionLabels[activity.action] || activity.action}
-                      </p>
-                      {activity.details && Object.keys(activity.details).length > 0 && (
-                        <p className="text-gray-500 text-xs">
-                          {activity.action === 'status_changed'
-                            ? `${(activity.details as Record<string, string>).from} â ${(activity.details as Record<string, string>).to}`
-                            : JSON.stringify(activity.details)}
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {activities.map((activity, index) => {
+                  const iconConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+                    member_approved: { icon: <UserCheck className="w-3.5 h-3.5" />, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/40' },
+                    status_changed: { icon: <ArrowRightLeft className="w-3.5 h-3.5" />, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/40' },
+                    tag_added: { icon: <Tag className="w-3.5 h-3.5" />, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/40' },
+                    tag_removed: { icon: <Tag className="w-3.5 h-3.5" />, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/40' },
+                    note_added: { icon: <MessageSquare className="w-3.5 h-3.5" />, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/40' },
+                    assigned: { icon: <UserPlus className="w-3.5 h-3.5" />, color: 'text-indigo-600', bg: 'bg-indigo-100 dark:bg-indigo-900/40' },
+                    email_sent: { icon: <Send className="w-3.5 h-3.5" />, color: 'text-cyan-600', bg: 'bg-cyan-100 dark:bg-cyan-900/40' },
+                    exported: { icon: <ExternalLink className="w-3.5 h-3.5" />, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-700' },
+                    member_deleted: { icon: <Trash2 className="w-3.5 h-3.5" />, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/40' },
+                    pipeline_stage_changed: { icon: <ArrowRightLeft className="w-3.5 h-3.5" />, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/40' },
+                  }
+                  const config = iconConfig[activity.action] || { icon: <Clock className="w-3.5 h-3.5" />, color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' }
+
+                  return (
+                    <div key={activity.id} className="flex gap-3 text-sm py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <div className={`w-7 h-7 rounded-full ${config.bg} ${config.color} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                        {config.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {actionLabels[activity.action] || activity.action}
                         </p>
-                      )}
-                      <p className="text-gray-400 text-xs">
-                        {new Date(activity.created_at).toLocaleString()}
-                      </p>
+                        {activity.details && Object.keys(activity.details).length > 0 && (
+                          <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
+                            {activity.action === 'status_changed' || activity.action === 'pipeline_stage_changed'
+                              ? `${(activity.details as Record<string, string>).from} â ${(activity.details as Record<string, string>).to}`
+                              : activity.action === 'tag_added' || activity.action === 'tag_removed'
+                                ? (activity.details as Record<string, string>).tag
+                                : JSON.stringify(activity.details)}
+                          </p>
+                        )}
+                        <p className="text-gray-400 dark:text-gray-500 text-xs mt-0.5">
+                          {new Date(activity.created_at).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
