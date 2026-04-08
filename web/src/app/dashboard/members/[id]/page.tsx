@@ -4,10 +4,27 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, ExternalLink, Mail, MessageCircle, Phone, Tag, Clock, User, MessageSquare,
+  ArrowLeft, ExternalLink, Mail, Phone, Tag, Clock, User, MessageSquare,
   Loader2, Save, Trash2, X, Plus
 } from 'lucide-react'
 import type { Member, ActivityLog, MemberStatus } from '@/types/database'
+
+type PipelineStageInfo = {
+  stage_id: string
+  stage_name: string
+  stage_color: string
+  pipeline_id: string
+  pipeline_name: string
+  pipeline_member_id: string
+}
+
+type PipelineStageOption = {
+  id: string
+  name: string
+  color: string
+  status_mapping: string
+  position: number
+}
 
 type MemberWithGroup = Member & { group?: { id: string; name: string; fb_group_url: string | null } }
 
@@ -26,6 +43,11 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
   const [newTag, setNewTag] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+
+  // Pipeline state
+  const [pipelineStage, setPipelineStage] = useState<PipelineStageInfo | null>(null)
+  const [pipelineStages, setPipelineStages] = useState<PipelineStageOption[]>([])
+  const [changingStage, setChangingStage] = useState(false)
 
   const statusColors = {
     new: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
@@ -48,19 +70,6 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     pipeline_stage_changed: 'Pipeline stage changed',
   }
 
-  const actionIcons: Record<string, { color: string; bg: string }> = {
-    member_approved: { color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
-    status_changed: { color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    tag_added: { color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
-    tag_removed: { color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-    note_added: { color: 'text-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
-    assigned: { color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30' },
-    exported: { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
-    email_sent: { color: 'text-cyan-500', bg: 'bg-cyan-100 dark:bg-cyan-900/30' },
-    member_deleted: { color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' },
-    pipeline_stage_changed: { color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  }
-
   useEffect(() => {
     async function loadMember() {
       try {
@@ -79,6 +88,10 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         setTags(data.member.tags || [])
         setEmail(data.member.email || '')
         setPhone(data.member.phone || '')
+
+        // Set pipeline data
+        setPipelineStage(data.pipelineStage || null)
+        setPipelineStages(data.pipelineStages || [])
       } catch (err) {
         console.error('Error loading member:', err)
       } finally {
@@ -126,6 +139,32 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     if (!confirm('Delete this member? This cannot be undone.')) return
     await fetch(`/api/members/${id}`, { method: 'DELETE' })
     router.push('/dashboard/members')
+  }
+
+  const handlePipelineStageChange = async (newStageId: string) => {
+    if (!newStageId || newStageId === pipelineStage?.stage_id) return
+    setChangingStage(true)
+    try {
+      const res = await fetch(`/api/members/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipeline_stage_id: newStageId }),
+      })
+      if (res.ok) {
+        // Reload full member data to get synced status + pipeline info
+        const reloadRes = await fetch(`/api/members/${id}`)
+        const reloadData = await reloadRes.json()
+        setMember(reloadData.member)
+        setStatus(reloadData.member.status)
+        setActivities(reloadData.activities || [])
+        setPipelineStage(reloadData.pipelineStage || null)
+        setPipelineStages(reloadData.pipelineStages || [])
+      }
+    } catch (err) {
+      console.error('Error changing pipeline stage:', err)
+    } finally {
+      setChangingStage(false)
+    }
   }
 
   if (loading) {
@@ -206,23 +245,15 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  <MessageCircle className="w-4 h-4 inline mr-1" /> Facebook Message
+                  <Phone className="w-4 h-4 inline mr-1" /> Phone
                 </label>
-                <a
-                  href={
-                    member.fb_user_id
-                      ? `https://www.facebook.com/messages/t/${member.fb_user_id}`
-                      : member.fb_profile_url
-                        ? `https://www.facebook.com/messages/t/${member.fb_profile_url.replace(/https?:\/\/(www\.)?facebook\.com\//, '').replace(/\/.*$/, '')}`
-                        : `https://www.facebook.com/search/people/?q=${encodeURIComponent(member.name)}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium justify-center"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  {member.fb_user_id ? 'Send Message' : member.fb_profile_url ? 'Send Message' : 'Message on Facebook'}
-                </a>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="No phone captured"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
 
@@ -312,6 +343,40 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             </span>
           </div>
 
+          {/* Pipeline Stage */}
+          {pipelineStages.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
+              <h2 className="text-lg font-bold">Pipeline Stage</h2>
+              {pipelineStage && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">{pipelineStage.pipeline_name}</p>
+              )}
+              <select
+                value={pipelineStage?.stage_id || ''}
+                onChange={(e) => handlePipelineStageChange(e.target.value)}
+                disabled={changingStage}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {pipelineStages.map((stage) => (
+                  <option key={stage.id} value={stage.id}>{stage.name}</option>
+                ))}
+              </select>
+              {pipelineStage && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: pipelineStage.stage_color }}
+                  />
+                  <span className="text-sm font-medium">{pipelineStage.stage_name}</span>
+                </div>
+              )}
+              {changingStage && (
+                <p className="text-xs text-blue-500 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Syncing...
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Tags */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
             <h2 className="text-lg font-bold flex items-center gap-2">
@@ -351,49 +416,35 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* Activity Timeline */}
+          {/* Activity Log */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
             <h2 className="text-lg font-bold flex items-center gap-2">
-              <Clock className="w-5 h-5" /> Activity Timeline
+              <Clock className="w-5 h-5" /> Activity
             </h2>
             {activities.length === 0 ? (
               <p className="text-sm text-gray-500">No activity recorded yet.</p>
             ) : (
-              <div className="relative max-h-96 overflow-y-auto pr-2">
-                <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-                <div className="space-y-4">
-                  {activities.map((activity, idx) => {
-                    const style = actionIcons[activity.action] || { color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700' }
-                    return (
-                      <div key={activity.id} className="relative flex gap-3 text-sm">
-                        <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${style.bg}`}>
-                          <div className={`w-2 h-2 rounded-full ${style.color.replace('text-', 'bg-')}`}></div>
-                        </div>
-                        <div className="flex-1 pb-1">
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {actionLabels[activity.action] || activity.action}
-                          </p>
-                          {activity.details && Object.keys(activity.details).length > 0 && (
-                            <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
-                              {activity.action === 'status_changed'
-                                ? `${(activity.details as Record<string, string>).from} → ${(activity.details as Record<string, string>).to}`
-                                : activity.action === 'pipeline_stage_changed'
-                                ? `Moved to ${(activity.details as Record<string, string>).stage_name || 'new stage'}`
-                                : activity.action === 'tag_added' || activity.action === 'tag_removed'
-                                ? ((activity.details as Record<string, string[]>).tags || []).join(', ')
-                                : activity.action === 'note_added'
-                                ? (activity.details as Record<string, string>).note || ''
-                                : JSON.stringify(activity.details)}
-                            </p>
-                          )}
-                          <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-                            {new Date(activity.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {activities.map((activity) => (
+                  <div key={activity.id} className="flex gap-3 text-sm">
+                    <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500 flex-shrink-0"></div>
+                    <div>
+                      <p className="font-medium">
+                        {actionLabels[activity.action] || activity.action}
+                      </p>
+                      {activity.details && Object.keys(activity.details).length > 0 && (
+                        <p className="text-gray-500 text-xs">
+                          {activity.action === 'status_changed'
+                            ? `${(activity.details as Record<string, string>).from} â ${(activity.details as Record<string, string>).to}`
+                            : JSON.stringify(activity.details)}
+                        </p>
+                      )}
+                      <p className="text-gray-400 text-xs">
+                        {new Date(activity.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
